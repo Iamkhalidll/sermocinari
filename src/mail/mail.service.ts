@@ -2,7 +2,6 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
 import * as dotenv from 'dotenv';
 import { ConfigService } from '@nestjs/config';
-
 dotenv.config();
 
 interface MailOptions {
@@ -58,7 +57,7 @@ export class MailService {
     try {
       await this.transporter.verify();
       this.logger.log('Gmail SMTP connection verified successfully');
-    } catch (error) {
+    } catch (error:any) {
       this.logger.error('Failed to verify Gmail SMTP connection:', error.message);
       throw error;
     }
@@ -341,7 +340,7 @@ export class MailService {
           .filter((result, index) => result.status === 'rejected')
           .map((result, index) => ({
             email: emails[index],
-            error: (result as PromiseRejectedResult).reason
+            error: (result).reason
           }));
 
         this.logger.warn('Failed bulk email sends:', failedResults);
@@ -355,7 +354,7 @@ export class MailService {
   }
 
   async close(): Promise<void> {
-    this.transporter.close();
+   await  this.transporter.close();
     this.logger.log('Gmail SMTP connection closed');
   }
 }

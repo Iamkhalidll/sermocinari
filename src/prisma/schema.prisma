@@ -8,8 +8,21 @@ generator client {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  email     String   @unique
-  name      String?
-  createdAt DateTime @default(now())
+  id                String    @id @default(uuid())
+  name              String
+  email             String    @unique
+  password          String
+  emailVerified     Boolean   @default(false)
+  verificationOtp   String?
+  otpExpiry         DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  // Password reset fields
+  resetToken        String?
+  resetTokenExpiry  DateTime?
+
+  
+  @@index([email])
+  @@index([verificationOtp])
 }

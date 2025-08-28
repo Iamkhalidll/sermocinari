@@ -1,13 +1,19 @@
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 
+export interface ReqInrf extends Request {
+   user:{
+    id:string,
+    email:string
+   }
+}
 @Injectable()
 export class JWTAuthGuard implements CanActivate {
   constructor(private jwtService: JwtService) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const request = context.switchToHttp().getRequest();
-    const authHeader = request.headers['authorization'];
+    const request:ReqInrf= context.switchToHttp().getRequest();
+    const authHeader: string | undefined = request.headers['authorization'];
 
     if (!authHeader) {
       throw new UnauthorizedException('Unauthorized: No token provided');
@@ -20,11 +26,12 @@ export class JWTAuthGuard implements CanActivate {
 
     try {
       const secretKey = process.env.JWT_SECRET;
-      const decodedToken = await this.jwtService.verifyAsync(token, { secret: secretKey });
+      const {id,email}= await this.jwtService.verifyAsync(token, { secret: secretKey });
 
       // Attach user info to request
       request.user = {
-        userId: decodedToken.id, // Assuming JWT `sub` contains user ID
+        id,
+        email
       };
 
       return true;
