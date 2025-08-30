@@ -1,8 +1,13 @@
 import { Injectable } from '@nestjs/common';
-
+import { ChatRepository } from './chat.repository';
 @Injectable()
 export class ChatService {
-  addUser(socketId: string, username: string) {
+  constructor(
+    private readonly chatRepository: ChatRepository,
+  ) {}
+
+  addUser(socketId: string) {
+    
   }
 
   removeUser(socketId: string) {

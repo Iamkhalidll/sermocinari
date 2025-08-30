@@ -8,8 +8,9 @@ import {
   WebSocketGateway,
   WebSocketServer,
 } from '@nestjs/websockets';
-import { WsAuthGuard } from './guard/ws-guard';
-import { Server, Socket } from 'socket.io';
+import { WsAuthGuard } from '../guards/ws-guard';
+import { Server } from 'socket.io';
+import { AuthenticatedSocket } from '../guards/ws-guard';
 
 UseGuards(WsAuthGuard);
 @WebSocketGateway( { cors: { origin: '*' } })
@@ -17,27 +18,19 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
   private readonly logger = new Logger(ChatGateway.name);
 
-  handleConnection(client: Socket) {
+  handleConnection(client: AuthenticatedSocket) {
     this.logger.log(`Client connected ${client.id}`);
-
     client.broadcast.emit('user-joined', {
       message: `User joined the chat: ${client.id}`,
       clientId: client.id,
     });
   }
 
-  handleDisconnect(@ConnectedSocket() client: Socket) {
+  handleDisconnect(@ConnectedSocket() client: AuthenticatedSocket) {
     this.logger.log(`Client disconnected ${client.id}`);
-
     this.server.emit('user-left', {
       message: `User left the chat: ${client.id}`,
       clientId: client.id,
     });
-  }
-
-  @SubscribeMessage('newMessage')
-  handleNewMessage(@MessageBody() message: any): void {
-    this.logger.log(`New message: ${JSON.stringify(message)}`);
-    this.server.emit('message', message);
   }
 }

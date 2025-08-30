@@ -17,12 +17,34 @@ model User {
   otpExpiry         DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
-  
-  // Password reset fields
+
   resetToken        String?
   resetTokenExpiry  DateTime?
 
-  
-  @@index([email])
-  @@index([verificationOtp])
+  messagesSent      Message[] @relation("SentMessages")
+  messagesReceived  Message[] @relation("ReceivedMessages")
+  sessions          Session[]
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  socketId  String   @unique
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([socketId])
+}
+
+model Message {
+  id          String   @id @default(uuid())
+  senderId    String
+  recipientId String
+  text        String
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  sender      User     @relation("SentMessages", fields: [senderId], references: [id])
+  recipient   User     @relation("ReceivedMessages", fields: [recipientId], references: [id])
 }

@@ -18,7 +18,7 @@ export class WsAuthGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const client: Socket = context.switchToWs().getClient();
+    const client: AuthenticatedSocket = context.switchToWs().getClient();
     
     try {
       const token = 
@@ -38,11 +38,7 @@ export class WsAuthGuard implements CanActivate {
       });
 
       // Attach user to socket
-      (client as AuthenticatedSocket).user = {
-        id ,
-        email
-      };
-
+      client.user = { id, email };
       return true;
     } catch (error) {
       client.emit('unauthorized', { message: 'Invalid or expired token' });
