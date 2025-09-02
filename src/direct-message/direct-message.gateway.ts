@@ -13,12 +13,15 @@ import { Server } from 'socket.io';
 import { AuthenticatedSocket } from '../guards/ws-guard';
 import { DirectMessageService } from './direct-message.service';
 
-UseGuards(WsAuthGuard);
-@WebSocketGateway({ cors: { origin: '*' } })
+
+@UseGuards(WsAuthGuard) 
+@WebSocketGateway(3001,{ cors: { origin: '*' } })
 export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @WebSocketServer() server: Server;
     private readonly logger = new Logger(DirectMessageGateway.name);
-    private readonly directMessageService: DirectMessageService;
+    constructor(
+        private readonly directMessageService:DirectMessageService
+    ){}
 
     handleConnection(client: AuthenticatedSocket) {
         this.logger.log(`Client connected ${client.id}`);
@@ -41,6 +44,7 @@ export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisco
         @MessageBody() payload: { to: string; message: string },
         @ConnectedSocket() client: AuthenticatedSocket,
     ) {
+        console.log(client.user)
         await this.directMessageService.sendTextMessage(client.user.id, payload.to, payload.message);
         this.logger.log(`Saved Direct  message from ${client.user.id} to ${payload.to}`);
 

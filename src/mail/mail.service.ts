@@ -33,19 +33,20 @@ export class MailService {
       throw new Error('Gmail credentials not found. Please check your GMAIL_USER and GMAIL_PASSWORD environment variables.');
     }
 
-    // Create transporter with Gmail SMTP
-    this.transporter = nodemailer.createTransport({
-      host: 'smtp.gmail.com',
-      auth: {
-        user: gmailUser,
-        pass: gmailPassword, // Use App Password, not regular password
-      },
-      port: 587,
-      secure: false, // true for 465, false for other ports
-      tls: {
-        rejectUnauthorized: false, // allow self-signed / untrusted certs
-      },
-    });
+this.transporter = nodemailer.createTransport({
+  host: 'smtp.gmail.com',
+  port: 465,
+  secure: true,
+  auth: {
+    user: gmailUser,
+    pass: gmailPassword,
+  },
+  tls: {
+    rejectUnauthorized: false, 
+  },
+});
+
+
 
     this.logger.log('Initializing Nodemailer with Gmail SMTP for email sending');
 
