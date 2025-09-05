@@ -1,62 +1,99 @@
 import { Logger, UseGuards } from '@nestjs/common';
 import {
     ConnectedSocket,
+    MessageBody,
     OnGatewayConnection,
     OnGatewayDisconnect,
+    SubscribeMessage,
     WebSocketGateway,
     WebSocketServer,
-    SubscribeMessage,
-    MessageBody,
 } from '@nestjs/websockets';
-import { WsAuthGuard } from '../guards/ws-guard';
 import { Server } from 'socket.io';
-import { AuthenticatedSocket } from '../guards/ws-guard';
+import { AuthenticatedSocket, WsAuthGuard } from '../guards/ws-guard';
 import { DirectMessageService } from './direct-message.service';
 
-
-@UseGuards(WsAuthGuard) 
-@WebSocketGateway(3001,{ cors: { origin: '*' } })
-export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisconnect {
+@UseGuards(WsAuthGuard)
+@WebSocketGateway(3001, { cors: { origin: '*' } })
+export class DirectMessageGateway
+    implements OnGatewayConnection, OnGatewayDisconnect
+{
     @WebSocketServer() server: Server;
     private readonly logger = new Logger(DirectMessageGateway.name);
-    constructor(
-        private readonly directMessageService:DirectMessageService
-    ){}
+    private readonly onlineUsers = new Map<string, string>();
+
+    constructor(private readonly directMessageService: DirectMessageService) {}
 
     handleConnection(client: AuthenticatedSocket) {
-        this.logger.log(`Client connected ${client.id}`);
-        client.broadcast.emit('user-joined', {
-            message: `User joined the chat: ${client.id}`,
-            clientId: client.id,
-        });
+        this.logger.log(`Client connected: ${client.id}, User ID: ${client.user.id}`);
+        this.onlineUsers.set(client.user.id, client.id);
     }
 
     handleDisconnect(@ConnectedSocket() client: AuthenticatedSocket) {
-        this.logger.log(`Client disconnected ${client.id}`);
-        this.server.emit('user-left', {
-            message: `User left the chat: ${client.id}`,
-            clientId: client.id,
-        });
-    }
-    
-    @SubscribeMessage('send-direct-message')
-    async handleDirectMessage(
-        @MessageBody() payload: { to: string; message: string },
-        @ConnectedSocket() client: AuthenticatedSocket,
-    ) {
-        console.log(client.user)
-        await this.directMessageService.sendTextMessage(client.user.id, payload.to, payload.message);
-        this.logger.log(`Saved Direct  message from ${client.user.id} to ${payload.to}`);
-
-        this.server.emit('direct-message', {
-            from: client.user.id,
-            to: payload.to,
-            message: payload.message,
-        });
-        this.logger.log(`Direct message sent from ${client.user.id} to ${payload.to}`);
-        return{
-            status: 'Message sent'
+        this.logger.log(`Client disconnected: ${client.id}, User ID: ${client.user.id}`);
+        if (client.user) {
+            this.onlineUsers.delete(client.user.id);
         }
     }
 
+    @SubscribeMessage('start-conversation')
+    async startConversation(
+        @MessageBody() payload: { toUserId: string },
+        @ConnectedSocket() client: AuthenticatedSocket,
+    ) {
+        const senderId = client.user.id;
+        const recipientId = payload.toUserId;
+
+        const conversationId = await this.directMessageService.startConversation(
+            senderId,
+            recipientId,
+        );
+
+       await client.join(conversationId);
+        this.logger.log(
+            `Sender ${senderId} (${client.id}) joined room ${conversationId}`,
+        );
+
+        const recipientSocketId = this.onlineUsers.get(recipientId);
+        if (recipientSocketId) {
+            const recipientSocket = this.server.sockets.sockets.get(recipientSocketId);
+            if(recipientSocket) {
+               await recipientSocket.join(conversationId);
+                this.logger.log(
+                    `Recipient ${recipientId} (${recipientSocketId}) joined room ${conversationId}`,
+                );
+            }
+        }
+
+        return {
+            status: 'OK',
+            conversationId,
+        };
+    }
+
+    @SubscribeMessage('send-direct-message')
+    async handleDirectMessage(
+        @MessageBody() payload: { conversationId: string; content: string },
+        @ConnectedSocket() client: AuthenticatedSocket,
+    ) {
+        const { conversationId, content } = payload;
+        const senderId = client.user.id;
+
+        const message = await this.directMessageService.sendTextMessage(
+            conversationId,
+            senderId,
+            content,
+        );
+
+        this.server.to(conversationId).emit('new-direct-message', message);
+
+        this.logger.log(
+            `Message from ${senderId} sent to room ${conversationId}`,
+        );
+
+        return {
+            status: 'Message Sent',
+            message,
+        };
+    }
 }
+
