@@ -2,21 +2,31 @@ import {
     BadRequestException,
     Injectable,
     InternalServerErrorException,
+    Logger
 } from '@nestjs/common';
 import { DirectMessageRepository } from './direct-message.repository';
 
 @Injectable()
 export class DirectMessageService {
+    private readonly logger = new Logger(DirectMessageService.name)
     constructor(
         private readonly directMessageRepository: DirectMessageRepository,
     ) {}
+    async connect(userId:string,socketId:string):Promise<void> {
+        await this.directMessageRepository.connect(userId,socketId)
+        this.logger.log("User has connected  ")
+    }
+    async disconnect(socketId:string):Promise<void>{
+        await this.directMessageRepository.disconnect(socketId);
+        this.logger.log("User has disconnected")
+    }
 
     async startConversation(
         fromUserId: string,
         toUserId: string,
     ): Promise<string> {
         try {
-            const roomId = await this.directMessageRepository.getConversationId(
+            const roomId = await this.directMessageRepository.findOrCreateConversation(
                 fromUserId,
                 toUserId,
             );
@@ -25,10 +35,18 @@ export class DirectMessageService {
             }
             return roomId;
         } catch (error) {
-            this.logError(error);
+            this.logger.log(error);
             throw new InternalServerErrorException();
         }
     }
+    async getUserSockets(userId: string) {
+    try {
+        return await this.directMessageRepository.getActiveSessionforUser(userId);
+    } catch (error) {
+        this.logger.error(error);
+        throw new InternalServerErrorException('Could not fetch user sessions');
+    }
+}
 
     async sendTextMessage(
         conversationId: string,
@@ -43,7 +61,7 @@ export class DirectMessageService {
             );
             return message;
         } catch (error) {
-            this.logError(error);
+            this.logger.log(error);
             if (error instanceof BadRequestException) {
                 throw error;
             }
@@ -51,7 +69,4 @@ export class DirectMessageService {
         }
     }
 
-    private logError(error: any) {
-        console.error(error);
-    }
 }

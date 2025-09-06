@@ -19,13 +19,11 @@ export class WsAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const client: AuthenticatedSocket = context.switchToWs().getClient();
-    
     try {
       const token = 
         client.handshake.auth?.token || 
         client.handshake.query?.token ||
         client.request.headers.authorization?.split(' ')[1];
-
       if (!token) {
         client.emit('unauthorized', { message: 'No token provided' });
         client.disconnect();

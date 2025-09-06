@@ -11,30 +11,57 @@ import {
 import { Server } from 'socket.io';
 import { AuthenticatedSocket, WsAuthGuard } from '../guards/ws-guard';
 import { DirectMessageService } from './direct-message.service';
+// Import services needed for manual authentication
+import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 
-@UseGuards(WsAuthGuard)
 @WebSocketGateway(3001, { cors: { origin: '*' } })
-export class DirectMessageGateway
-    implements OnGatewayConnection, OnGatewayDisconnect
-{
+export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @WebSocketServer() server: Server;
     private readonly logger = new Logger(DirectMessageGateway.name);
-    private readonly onlineUsers = new Map<string, string>();
+    constructor(
+        private readonly directMessageService: DirectMessageService,
+        private readonly jwtService: JwtService,
+        private readonly configService: ConfigService,
+    ) {}
 
-    constructor(private readonly directMessageService: DirectMessageService) {}
+    async handleConnection(client: AuthenticatedSocket) {
+        try {
+            const token =
+                client.handshake.auth?.token ||
+                client.handshake.query?.token ||
+                client.handshake.headers.authorization?.split(' ')[1];
 
-    handleConnection(client: AuthenticatedSocket) {
-        this.logger.log(`Client connected: ${client.id}, User ID: ${client.user.id}`);
-        this.onlineUsers.set(client.user.id, client.id);
-    }
+            if (!token) {
+                throw new Error('No token provided');
+            }
 
-    handleDisconnect(@ConnectedSocket() client: AuthenticatedSocket) {
-        this.logger.log(`Client disconnected: ${client.id}, User ID: ${client.user.id}`);
-        if (client.user) {
-            this.onlineUsers.delete(client.user.id);
+            const {id,email}= await this.jwtService.verifyAsync(token, {
+                secret: this.configService.get('JWT_SECRET'),
+            });
+
+            client.user = { id, email };
+            
+            await this.directMessageService.connect(client.user.id, client.id);
+            this.logger.log(`Client connected: ${client.id}, User ID: ${client.user.id}`);
+
+        } catch (error) {
+            this.logger.error(`Authentication failed: ${error.message}`);
+            client.emit('unauthorized', { message: 'Authentication failed' });
+            client.disconnect();
         }
     }
+    async handleDisconnect(@ConnectedSocket() client: AuthenticatedSocket) {
+        if (client.user) {
+            await this.directMessageService.disconnect(client.id);
+            this.logger.log(`Client disconnected: ${client.id}, User ID: ${client.user.id}`);
+        } else {
+            this.logger.log(`Client disconnected: ${client.id} (unauthenticated)`);
+        }
+        client.disconnect();
+    }
 
+    @UseGuards(WsAuthGuard)
     @SubscribeMessage('start-conversation')
     async startConversation(
         @MessageBody() payload: { toUserId: string },
@@ -48,28 +75,29 @@ export class DirectMessageGateway
             recipientId,
         );
 
-       await client.join(conversationId);
+        await client.join(conversationId);
         this.logger.log(
             `Sender ${senderId} (${client.id}) joined room ${conversationId}`,
         );
 
-        const recipientSocketId = this.onlineUsers.get(recipientId);
-        if (recipientSocketId) {
-            const recipientSocket = this.server.sockets.sockets.get(recipientSocketId);
-            if(recipientSocket) {
-               await recipientSocket.join(conversationId);
-                this.logger.log(
-                    `Recipient ${recipientId} (${recipientSocketId}) joined room ${conversationId}`,
-                );
+        const recipientSessions = await this.directMessageService.getUserSockets(recipientId);
+        console.log(recipientSessions)
+        if (recipientSessions.length > 0) {
+            for (const session of recipientSessions) {
+                const recipientSocket = this.server.sockets.sockets.get(session.socketId);
+                if (recipientSocket) {
+                    await recipientSocket.join(conversationId);
+                    this.logger.log(`Recipient ${recipientId} (${session.socketId}) joined room ${conversationId}`);
+                }
             }
         }
-
         return {
             status: 'OK',
             conversationId,
         };
     }
 
+    @UseGuards(WsAuthGuard)
     @SubscribeMessage('send-direct-message')
     async handleDirectMessage(
         @MessageBody() payload: { conversationId: string; content: string },
@@ -86,14 +114,10 @@ export class DirectMessageGateway
 
         this.server.to(conversationId).emit('new-direct-message', message);
 
-        this.logger.log(
-            `Message from ${senderId} sent to room ${conversationId}`,
-        );
-
+        this.logger.log(`Message from ${senderId} sent to room ${conversationId}`);
         return {
             status: 'Message Sent',
             message,
         };
     }
 }
-

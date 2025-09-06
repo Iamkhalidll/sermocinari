@@ -1,8 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import * as nodemailer from 'nodemailer';
-import * as dotenv from 'dotenv';
 import { ConfigService } from '@nestjs/config';
-dotenv.config();
 
 interface MailOptions {
   to: string;
@@ -14,55 +12,62 @@ interface MailOptions {
 }
 
 @Injectable()
-export class MailService {
+export class MailService implements OnModuleInit {
   private readonly logger = new Logger(MailService.name);
   private readonly defaultFromEmail: string;
   private readonly defaultReplyTo: string;
   private readonly transporter: nodemailer.Transporter;
 
   constructor(private configService: ConfigService) {
-    // Get default sender configuration
-    this.defaultFromEmail = this.configService.get('MAIL_FROM_ADDRESS') || 'noreply@yourdomain.com';
-    this.defaultReplyTo = this.configService.get('MAIL_REPLY_TO') || 'your.email@gmail.com';
+    this.defaultFromEmail =
+      this.configService.get('MAIL_FROM_ADDRESS') || 'noreply@yourdomain.com';
+    this.defaultReplyTo =
+      this.configService.get('MAIL_REPLY_TO') || 'your.email@gmail.com';
 
-    // Get Gmail SMTP configuration
     const gmailUser = this.configService.get('GMAIL_USER');
-    const gmailPassword = this.configService.get('GMAIL_PASSWORD'); // App Password
+    const gmailPassword = this.configService.get('GMAIL_PASSWORD');
 
     if (!gmailUser || !gmailPassword) {
-      throw new Error('Gmail credentials not found. Please check your GMAIL_USER and GMAIL_PASSWORD environment variables.');
+      throw new Error(
+        'Gmail credentials not found. Please check your GMAIL_USER and GMAIL_PASSWORD environment variables.',
+      );
     }
 
-this.transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true,
-  auth: {
-    user: gmailUser,
-    pass: gmailPassword,
-  },
-  tls: {
-    rejectUnauthorized: false, 
-  },
-});
+    this.transporter = nodemailer.createTransport({
+      host: 'smtp.gmail.com',
+      auth: {
+        user: gmailUser,
+        pass: gmailPassword,
+      },
+      port: 587,
+      secure: false,
+      tls: {
+        rejectUnauthorized: false,
+      },
+    });
 
+    this.logger.log(
+      'Initializing Nodemailer with Gmail SMTP for email sending',
+    );
+  }
 
-
-    this.logger.log('Initializing Nodemailer with Gmail SMTP for email sending');
-
-    // Verify connection configuration
-    this.verifyConnection();
+  async onModuleInit(): Promise<void> {
+    await this.verifyConnection();
   }
 
   private async verifyConnection(): Promise<void> {
     try {
       await this.transporter.verify();
       this.logger.log('Gmail SMTP connection verified successfully');
-    } catch (error:any) {
-      this.logger.error('Failed to verify Gmail SMTP connection:', error.message);
+    } catch (error: any) {
+      this.logger.error(
+        'Failed to verify Gmail SMTP connection:',
+        error.message,
+      );
       throw error;
     }
   }
+
 
   async sendMail(options: MailOptions): Promise<boolean> {
     const { to, subject, html, from = this.defaultFromEmail, text, replyTo = this.defaultReplyTo } = options;

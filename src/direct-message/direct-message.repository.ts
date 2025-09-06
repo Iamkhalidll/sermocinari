@@ -4,12 +4,95 @@ import { Message } from '@prisma/client';
 
 @Injectable()
 export class DirectMessageRepository {
-    constructor(private readonly prisma: PrismaService) {}
+    constructor(private readonly prisma: PrismaService) { }
+    async createSession(socketId: string, userId: string) {
+        await this.prisma.session.create({
+            data: {
+                socketId,
+                userId
+            }
+        })
+    }
 
+    async updateOnlineStatus(id: string) {
+        await this.prisma.user.update({
+            where: { id },
+            data: {
+                isOnline: true,
+                lastSeen: new Date()
+            }
+        })
+    }
+
+    async connect(userId: string, socketId: string) {
+        return this.prisma.$transaction(async (tx) => {
+            const session = await tx.session.create({
+                data: { socketId, userId }
+            });
+
+            await tx.user.update({
+                where: { id: userId },
+                data: {
+                    isOnline: true,
+                    lastSeen: new Date(),
+                },
+            });
+
+            return session;
+        });
+    }
+
+
+    async disconnect(id: string) {
+        const session = await this.prisma.session.delete({
+            where: {
+                id
+            }
+        })
+        const activeSessions = await this.prisma.session.findMany({
+            where: {
+                userId: session.userId
+            }
+        })
+        if (activeSessions.length == 0) {
+            await this.prisma.user.update({
+                where: {
+                    id: session.id
+                },
+                data: {
+                    isOnline: false,
+                    lastSeen: new Date()
+                }
+            })
+        }
+    }
+    async getActiveSessionforUser(userId: string) {
+        const user = await this.getUser(userId)
+        if (!user) {
+            throw new BadRequestException("No such User")
+        }
+        const sessions = await this.prisma.session.findMany({
+            where: {
+                userId
+            },
+            orderBy: { createdAt: "desc" }
+        })
+        return sessions
+    }
+    async getUser(id: string) {
+        const user = await this.prisma.user.findFirst({
+            where: { id }
+        })
+        return user
+    }
     async findOrCreateConversation(
         userId1: string,
         userId2: string,
     ): Promise<string> {
+        if (userId1 === userId2) {
+            throw new BadRequestException("Users cannot start a conversation with themselves.");
+        }
+
         const conversations = await this.prisma.conversation.findMany({
             where: {
                 AND: [
@@ -23,8 +106,8 @@ export class DirectMessageRepository {
                 },
             },
         });
-        
-        const directConversation = conversations.find(c => c._count.participants === 2);
+
+        const directConversation = conversations.find(c => c.type === "DIRECT");
 
         if (directConversation) {
             return directConversation.id;
@@ -60,9 +143,10 @@ export class DirectMessageRepository {
         const recipient = conversation.participants.find(p => p.userId !== senderId);
 
         if (!recipient) {
-            throw new Error(
-                'Could not find a recipient in the conversation.',
+            throw new BadRequestException(
+                'Conversation does not have a valid recipient.'
             );
+
         }
 
         const message = await this.prisma.message.create({
@@ -82,16 +166,5 @@ export class DirectMessageRepository {
             },
         });
         return message;
-    }
-
-    async getConversationId(
-        fromUserId: string,
-        toUserId: string,
-    ): Promise<string> {
-        const conversationId = await this.findOrCreateConversation(
-            fromUserId,
-            toUserId,
-        );
-        return conversationId;
     }
 }
