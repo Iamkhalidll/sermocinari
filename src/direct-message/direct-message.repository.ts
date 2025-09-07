@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Message } from '@prisma/client';
+import { Conversation, Message } from '@prisma/client';
 
 @Injectable()
 export class DirectMessageRepository {
@@ -122,6 +122,27 @@ export class DirectMessageRepository {
             },
         });
         return newConversation.id;
+        
+    }
+    async findUserConversations(userId: string): Promise<Conversation[]> {
+        return await this.prisma.conversation.findMany({
+            where: {
+                participants: {
+                    some: {
+                        userId
+                    }
+                }
+            }
+        });
+    }
+    async markAsDelivered(id:string):Promise<void>{
+        await this.prisma.message.update({
+            where:{id},
+            data:{
+                isDelivered:true,
+                deliveredAt:new Date()
+            }
+        })
     }
 
     async createTextMessage(
@@ -166,5 +187,14 @@ export class DirectMessageRepository {
             },
         });
         return message;
+    }
+
+    async getPendingMessage(recipientId:string){
+      return  await this.prisma.message.findMany({
+            where:{
+                recipientId,
+                isDelivered:false
+            }
+        })
     }
 }

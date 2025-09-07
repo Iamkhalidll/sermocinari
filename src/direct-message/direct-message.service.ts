@@ -47,7 +47,15 @@ export class DirectMessageService {
         throw new InternalServerErrorException('Could not fetch user sessions');
     }
 }
-
+    async markAsDelivered(messageId:string){
+        await this.directMessageRepository.markAsDelivered(messageId)
+    }
+    async getUserConversations(userId:string){
+        return await this.directMessageRepository.findUserConversations(userId)
+    }
+    async getPendingMessage(recipientId:string){
+        return await this.directMessageRepository.getPendingMessage(recipientId);
+    }
     async sendTextMessage(
         conversationId: string,
         senderId: string,

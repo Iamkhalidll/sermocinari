@@ -23,7 +23,18 @@ export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisco
         private readonly directMessageService: DirectMessageService,
         private readonly jwtService: JwtService,
         private readonly configService: ConfigService,
-    ) {}
+    ) { }
+    async pendingMessages(client:AuthenticatedSocket){
+        const unDeliveredMessages= await this.directMessageService.getPendingMessage(client.user.id)
+        if(unDeliveredMessages){
+            for(const message of unDeliveredMessages){
+                client.emit("new-direct-message",message)
+                await this.directMessageService.markAsDelivered(message.id)
+            }
+            this.logger.log("Messages have been delivered")
+        }
+
+    }
 
     async handleConnection(client: AuthenticatedSocket) {
         try {
@@ -36,19 +47,24 @@ export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisco
                 throw new Error('No token provided');
             }
 
-            const {id,email}= await this.jwtService.verifyAsync(token, {
+            const { id, email } = await this.jwtService.verifyAsync(token, {
                 secret: this.configService.get('JWT_SECRET'),
             });
 
             client.user = { id, email };
-            
+            await this.pendingMessages(client);
             await this.directMessageService.connect(client.user.id, client.id);
+            const conversations = await this.directMessageService.getUserConversations(client.user.id);
+            if (conversations.length > 0) {
+                for (const conversation of conversations) {
+                    await client.join(conversation.id);
+                }
+            }
             this.logger.log(`Client connected: ${client.id}, User ID: ${client.user.id}`);
 
         } catch (error) {
             this.logger.error(`Authentication failed: ${error.message}`);
             client.emit('unauthorized', { message: 'Authentication failed' });
-            client.disconnect();
         }
     }
     async handleDisconnect(@ConnectedSocket() client: AuthenticatedSocket) {
@@ -111,10 +127,14 @@ export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisco
             senderId,
             content,
         );
-
+        const recipientSessions = await this.directMessageService.getUserSockets(message.recipientId as string)
+        if(recipientSessions.length>0){
+            this.server.to(conversationId).emit('new-direct-message', message);
+            await this.directMessageService.markAsDelivered(message.id);
+             this.logger.log(`Message delivered from ${senderId} sent to ${message.recipientId}`);
+        }
         this.server.to(conversationId).emit('new-direct-message', message);
-
-        this.logger.log(`Message from ${senderId} sent to room ${conversationId}`);
+       
         return {
             status: 'Message Sent',
             message,

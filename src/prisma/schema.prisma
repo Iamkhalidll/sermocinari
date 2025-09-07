@@ -74,6 +74,10 @@ model Message {
   recipientId    String?
   content        String
   type           MessageType @default(TEXT)
+  isDelivered    Boolean  @default(false)
+  deliveredAt    DateTime?
+  isRead         Boolean  @default(false)
+  readAt         DateTime?
   createdAt      DateTime @default(now())
 
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
