@@ -4,9 +4,10 @@ import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
 import { DirectMessageModule } from './direct-message/direct-message.module';
 import { MailModule } from './mail/mai.module';
+import { GroupMessageModule } from './group-message/group-message.module';
 
 @Module({
-  imports: [AuthModule, DirectMessageModule,MailModule],
+  imports: [AuthModule, DirectMessageModule,MailModule, GroupMessageModule],
   controllers: [AppController],
   providers: [AppService],
 })

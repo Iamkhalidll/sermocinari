@@ -11,7 +11,6 @@ import {
 import { Server } from 'socket.io';
 import { AuthenticatedSocket, WsAuthGuard } from '../guards/ws-guard';
 import { DirectMessageService } from './direct-message.service';
-// Import services needed for manual authentication
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 
