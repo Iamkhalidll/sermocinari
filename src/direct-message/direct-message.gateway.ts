@@ -1,4 +1,4 @@
-import { Logger, UseGuards } from '@nestjs/common';
+import { Logger } from '@nestjs/common';
 import {
     ConnectedSocket,
     MessageBody,
@@ -9,10 +9,8 @@ import {
     WebSocketServer,
 } from '@nestjs/websockets';
 import { Server } from 'socket.io';
-import { AuthenticatedSocket, WsAuthGuard } from '../guards/ws-guard';
+import { AuthenticatedSocket,WsAuthMiddleware } from '../common/middleware/ws-auth.middleware'
 import { DirectMessageService } from './direct-message.service';
-import { JwtService } from '@nestjs/jwt';
-import { ConfigService } from '@nestjs/config';
 
 @WebSocketGateway(3001, { cors: { origin: '*' } })
 export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -20,37 +18,24 @@ export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisco
     private readonly logger = new Logger(DirectMessageGateway.name);
     constructor(
         private readonly directMessageService: DirectMessageService,
-        private readonly jwtService: JwtService,
-        private readonly configService: ConfigService,
+        private readonly wsAuthMiddleware:WsAuthMiddleware
     ) { }
-    async pendingMessages(client:AuthenticatedSocket){
-        const unDeliveredMessages= await this.directMessageService.getPendingMessage(client.user.id)
-        if(unDeliveredMessages){
-            for(const message of unDeliveredMessages){
-                client.emit("new-direct-message",message)
+    async pendingMessages(client: AuthenticatedSocket) {
+        const unDeliveredMessages = await this.directMessageService.getPendingMessage(client.user.id)
+        if (unDeliveredMessages) {
+            for (const message of unDeliveredMessages) {
+                client.emit("new-direct-message", message)
                 await this.directMessageService.markAsDelivered(message.id)
             }
             this.logger.log("Messages have been delivered")
         }
 
     }
-
+    afterInit(server: Server) {
+        server.use(this.wsAuthMiddleware.use);
+        }
     async handleConnection(client: AuthenticatedSocket) {
         try {
-            const token =
-                client.handshake.auth?.token ||
-                client.handshake.query?.token ||
-                client.handshake.headers.authorization?.split(' ')[1];
-
-            if (!token) {
-                throw new Error('No token provided');
-            }
-
-            const { id, email } = await this.jwtService.verifyAsync(token, {
-                secret: this.configService.get('JWT_SECRET'),
-            });
-
-            client.user = { id, email };
             await this.pendingMessages(client);
             await this.directMessageService.connect(client.user.id, client.id);
             const conversations = await this.directMessageService.getUserConversations(client.user.id);
@@ -76,7 +61,6 @@ export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisco
         client.disconnect();
     }
 
-    @UseGuards(WsAuthGuard)
     @SubscribeMessage('start-conversation')
     async startConversation(
         @MessageBody() payload: { toUserId: string },
@@ -112,7 +96,6 @@ export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisco
         };
     }
 
-    @UseGuards(WsAuthGuard)
     @SubscribeMessage('send-direct-message')
     async handleDirectMessage(
         @MessageBody() payload: { conversationId: string; content: string },
@@ -127,13 +110,13 @@ export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisco
             content,
         );
         const recipientSessions = await this.directMessageService.getUserSockets(message.recipientId as string)
-        if(recipientSessions.length>0){
+        if (recipientSessions.length > 0) {
             this.server.to(conversationId).emit('new-direct-message', message);
             await this.directMessageService.markAsDelivered(message.id);
-             this.logger.log(`Message delivered from ${senderId} sent to ${message.recipientId}`);
+            this.logger.log(`Message delivered from ${senderId} sent to ${message.recipientId}`);
         }
         this.server.to(conversationId).emit('new-direct-message', message);
-       
+
         return {
             status: 'Message Sent',
             message,
