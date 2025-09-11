@@ -11,6 +11,7 @@ import {
 import { Server } from 'socket.io';
 import { AuthenticatedSocket,WsAuthMiddleware } from '../common/middleware/ws-auth.middleware'
 import { DirectMessageService } from './direct-message.service';
+import { ConnectionManager } from 'src/common/utilities/connection-manager';
 
 @WebSocketGateway(3001, { cors: { origin: '*' } })
 export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisconnect {
@@ -18,47 +19,19 @@ export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisco
     private readonly logger = new Logger(DirectMessageGateway.name);
     constructor(
         private readonly directMessageService: DirectMessageService,
-        private readonly wsAuthMiddleware:WsAuthMiddleware
+        private readonly wsAuthMiddleware:WsAuthMiddleware,
+        private readonly connectionManager:ConnectionManager
     ) { }
-    async pendingMessages(client: AuthenticatedSocket) {
-        const unDeliveredMessages = await this.directMessageService.getPendingMessage(client.user.id)
-        if (unDeliveredMessages) {
-            for (const message of unDeliveredMessages) {
-                client.emit("new-direct-message", message)
-                await this.directMessageService.markAsDelivered(message.id)
-            }
-            this.logger.log("Messages have been delivered")
-        }
-
-    }
+   
     afterInit(server: Server) {
         server.use(this.wsAuthMiddleware.use);
         }
     async handleConnection(client: AuthenticatedSocket) {
-        try {
-            await this.pendingMessages(client);
-            await this.directMessageService.connect(client.user.id, client.id);
-            const conversations = await this.directMessageService.getUserConversations(client.user.id);
-            if (conversations.length > 0) {
-                for (const conversation of conversations) {
-                    await client.join(conversation.id);
-                }
-            }
-            this.logger.log(`Client connected: ${client.id}, User ID: ${client.user.id}`);
+    await this.connectionManager.connect(client,'DIRECT')
 
-        } catch (error) {
-            this.logger.error(`Authentication failed: ${error.message}`);
-            client.emit('unauthorized', { message: 'Authentication failed' });
-        }
     }
     async handleDisconnect(@ConnectedSocket() client: AuthenticatedSocket) {
-        if (client.user) {
-            await this.directMessageService.disconnect(client.id);
-            this.logger.log(`Client disconnected: ${client.id}, User ID: ${client.user.id}`);
-        } else {
-            this.logger.log(`Client disconnected: ${client.id} (unauthenticated)`);
-        }
-        client.disconnect();
+        await this.connectionManager.disconnect(client.id)
     }
 
     @SubscribeMessage('start-conversation')

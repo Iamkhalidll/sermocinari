@@ -45,6 +45,9 @@ model Conversation {
   id        String   @id @default(uuid())
   type      ConversationType @default(DIRECT)
   createdAt DateTime @default(now())
+  name        String?           
+  description String?           
+  image       String?            
 
   participants ConversationParticipant[]
   messages     Message[]
@@ -56,14 +59,21 @@ enum ConversationType {
   GROUP
 }
 
+enum GroupRole {
+  MEMBER
+  ADMIN
+}
+
 model ConversationParticipant {
   id             String   @id @default(uuid())
   conversationId String
   userId         String
+  role           GroupRole @default(MEMBER) 
 
   conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-
+  
+  @@index([conversationId])
   @@unique([conversationId, userId])
 }
 
@@ -84,6 +94,7 @@ model Message {
   sender         User         @relation(fields: [senderId], references: [id])
   recipient      User?        @relation("ReceivedMessages", fields: [recipientId], references: [id])
 
+  @@index([conversationId])
 }
 
 enum MessageType {
