@@ -6,9 +6,10 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigModule } from '@nestjs/config';
 import { ConversationManager } from 'src/common/utilities/conversation-manager';
 import { ConnectionManager } from 'src/common/utilities/connection-manager';
+import { GroupMessageRepository } from './group-message.repository';
 
 @Module({
   imports:[JwtModule,ConfigModule],
-  providers: [GroupMessageService, GroupMessageGateway,WsAuthMiddleware,ConversationManager,ConnectionManager]
+  providers: [GroupMessageService, GroupMessageGateway,WsAuthMiddleware,ConversationManager,ConnectionManager,GroupMessageRepository]
 })
 export class GroupMessageModule {}
