@@ -1,11 +1,21 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { WsException } from '@nestjs/websockets';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Conversation, Message } from '@prisma/client';
 import { createGroup } from './group-message.service';
 
 @Injectable()
 export class GroupMessageRepository {
     constructor(private readonly prisma: PrismaService) { }
+     async getActiveSessionforUser(userId: string) {
+        const sessions = await this.prisma.session.findMany({
+            where: {
+                userId
+            },
+            orderBy: { createdAt: "desc" }
+        })
+        return sessions
+    }
+
     async createGroup(userId: string, createGroup: createGroup) {
         const participants: { userId: string; role: 'ADMIN' | 'MEMBER' }[] = [];
         participants.push({
@@ -36,5 +46,28 @@ export class GroupMessageRepository {
             },
         });
         return newGroup.id
+    }
+    async saveMessage(userId:string,groupId:string,content:string){
+        const group = await this.prisma.conversation.findFirst({
+            where:{
+                id:groupId,
+                participants:{
+                    some:{
+                        userId
+                    }
+                }
+            }
+        })
+        if(!group){
+            throw new WsException("Group doesn't exist or User isn't in group")
+        }
+        return  await this.prisma.message.create({
+            data:{
+                senderId:userId,
+                conversationId:groupId,
+                content
+            }
+        })
+
     }
 }

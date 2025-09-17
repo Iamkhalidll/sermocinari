@@ -96,7 +96,7 @@ export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisco
             }
             this.logger.log(`Message delivered from ${senderId} sent to ${message.recipientId}`);
             await this.directMessageService.markAsDelivered(message.id);
-            client.emit(' ', {
+            client.emit('message-delivered', {
                 messageId: message.id,
                 deliveredAt: new Date(),
             });

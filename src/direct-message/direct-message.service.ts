@@ -1,9 +1,8 @@
 import {
-    BadRequestException,
     Injectable,
-    InternalServerErrorException,
     Logger
 } from '@nestjs/common';
+import { WsException } from '@nestjs/websockets';
 import { DirectMessageRepository } from './direct-message.repository';
 
 @Injectable()
@@ -12,15 +11,6 @@ export class DirectMessageService {
     constructor(
         private readonly directMessageRepository: DirectMessageRepository,
     ) {}
-    async connect(userId:string,socketId:string):Promise<void> {
-        await this.directMessageRepository.connect(userId,socketId)
-        this.logger.log("User has connected  ")
-    }
-    async disconnect(socketId:string):Promise<void>{
-        await this.directMessageRepository.disconnect(socketId);
-        this.logger.log("User has disconnected")
-    }
-
     async startConversation(
         fromUserId: string,
         toUserId: string,
@@ -31,30 +21,33 @@ export class DirectMessageService {
                 toUserId,
             );
             if (!roomId) {
-                throw new BadRequestException('Could not find or create room');
+                throw new WsException('Could not find or create room');
             }
             return roomId;
         } catch (error) {
             this.logger.log(error);
-            throw new InternalServerErrorException();
+            if (error instanceof WsException) {
+                throw error;
+            }
+            throw new WsException('An unexpected error occurred');
         }
     }
     async getUserSockets(userId: string) {
-    try {
-        return await this.directMessageRepository.getActiveSessionforUser(userId);
-    } catch (error) {
-        this.logger.error(error);
-        throw new InternalServerErrorException('Could not fetch user sessions');
+        try {
+            return await this.directMessageRepository.getActiveSessionforUser(userId);
+        } catch (error) {
+            this.logger.error(error);
+            if (error instanceof WsException) {
+                throw error;
+            }
+            throw new WsException('Could not fetch user sessions');
+        }
     }
-}
     async markAsDelivered(messageId:string){
         await this.directMessageRepository.markAsDelivered(messageId)
     }
     async getUserConversations(userId:string){
         return await this.directMessageRepository.findUserConversations(userId)
-    }
-    async getPendingMessage(recipientId:string){
-        return await this.directMessageRepository.getPendingMessage(recipientId);
     }
     async sendTextMessage(
         conversationId: string,
@@ -70,11 +63,10 @@ export class DirectMessageService {
             return message;
         } catch (error) {
             this.logger.log(error);
-            if (error instanceof BadRequestException) {
+            if (error instanceof WsException) {
                 throw error;
             }
-            throw new InternalServerErrorException('Could not send message');
+            throw new WsException('Could not send message');
         }
     }
-
 }
