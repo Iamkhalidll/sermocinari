@@ -129,4 +129,24 @@ export class DirectMessageRepository {
         });
         return message;
     }
+    async markAsRead(messageId: string, userId: string) {
+    const message = await this.prisma.message.findFirst({
+        where: {
+            id: messageId,
+            recipientId: userId
+        }
+    });
+
+    if (!message) {
+        throw new WsException("Message not found or user is not the recipient");
+    }
+
+    return await this.prisma.message.update({
+        where: { id: messageId },
+        data: {
+            isRead: true,
+            readAt: new Date()
+        }
+    });
+}
 }

@@ -49,6 +49,17 @@ export class DirectMessageService {
     async getUserConversations(userId:string){
         return await this.directMessageRepository.findUserConversations(userId)
     }
+    async markAsRead(messageId: string, userId: string) {
+    try {
+        return await this.directMessageRepository.markAsRead(messageId, userId);
+    } catch (error) {
+        this.logger.error(error);
+        if (error instanceof WsException) {
+            throw error;
+        }
+        throw new WsException('An unexpected error occurred');
+    }
+}
     async sendTextMessage(
         conversationId: string,
         senderId: string,

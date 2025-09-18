@@ -68,7 +68,28 @@ export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisco
             conversationId,
         };
     }
+    @SubscribeMessage('mark-as-read')
+    async markAsRead(
+        @MessageBody() payload: { messageId: string },
+        @ConnectedSocket() client: AuthenticatedSocket,
+    ) {
+        const updatedMessage = await this.directMessageService.markAsRead(payload.messageId, client.user.id);
 
+        const senderSessions = await this.directMessageService.getUserSockets(updatedMessage.senderId);
+
+        for (const session of senderSessions) {
+            const senderSocket = this.server.sockets.sockets.get(session.socketId);
+            if (senderSocket) {
+                senderSocket.emit('message-read', {
+                    messageId: payload.messageId,
+                    readBy: client.user.id,
+                    readAt: updatedMessage.readAt
+                });
+            }
+        }
+
+        this.logger.log(`Message ${payload.messageId} marked as read by ${client.user.id}`);
+    }
     @SubscribeMessage('send-direct-message')
     async handleDirectMessage(
         @MessageBody() payload: { conversationId: string; content: string },
