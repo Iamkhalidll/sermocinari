@@ -13,7 +13,6 @@ export class GroupMessageService {
     async getUserSession(userId: string) {
         try {
             return await this.groupMessageRepository.getActiveSessionforUser(userId)
-
         } catch (error) {
             if (error instanceof WsException) {
                 throw error;
@@ -24,6 +23,28 @@ export class GroupMessageService {
     async createGroup(userId: string, createGroup: createGroup) {
         try {
             return await this.groupMessageRepository.createGroup(userId, createGroup);
+        } catch (error) {
+            this.logger.error(error)
+            if (error instanceof WsException) {
+                throw error;
+            }
+            throw new WsException(error.message || 'An unexpected error occurred');
+        }
+    }
+    async addMember(groupId: string, memberId: string) {
+        try {
+            return await this.groupMessageRepository.addMember(groupId, memberId);
+        } catch (error) {
+            this.logger.error(error)
+            if (error instanceof WsException) {
+                throw error;
+            }
+            throw new WsException(error.message || 'An unexpected error occurred');
+        }
+    }
+    async getGroupMembers(groupId: string) {
+        try {
+            return await this.groupMessageRepository.getGroupMembers(groupId);
         } catch (error) {
             this.logger.error(error)
             if (error instanceof WsException) {
@@ -44,4 +65,37 @@ export class GroupMessageService {
             throw new WsException(error.message || `An unexpected error occured`)
         }
     }
+    async markAsDelivered(messageId: string) {
+        try {
+            return await this.groupMessageRepository.markAsDelivered(messageId);
+        } catch (error) {
+            this.logger.error(error)
+            if (error instanceof WsException) {
+                throw error;
+            }
+            throw new WsException(error.message || 'An unexpected error occurred');
+        }
+    }
+    async markAsRead(messageId: string, userId: string) {
+        try {
+            return await this.groupMessageRepository.markAsRead(messageId, userId);
+        } catch (error) {
+            this.logger.error(error)
+            if (error instanceof WsException) {
+                throw error;
+            }
+            throw new WsException(error.message || 'An unexpected error occurred');
+        }
+    }
+    async getUserGroups(userId: string) {
+    try {
+        return await this.groupMessageRepository.getUserGroups(userId);
+    } catch (error) {
+        this.logger.error(error)
+        if (error instanceof WsException) {
+            throw error;
+        }
+        throw new WsException(error.message || 'An unexpected error occurred');
+    }
+}
 }
