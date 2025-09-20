@@ -1,6 +1,6 @@
 import { Injectable, Logger, BadRequestException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Conversation, Prisma } from '@prisma/client';
+import { Conversation, Prisma ,GroupRole} from '@prisma/client';
 
 export type ConversationType = 'DIRECT' | 'GROUP';
 
@@ -47,19 +47,24 @@ export class ConversationManager {
         return newConversation.id;
     }
 
-    async createGroupConversation(creatorId: string, participantIds: string[], name?: string): Promise<string> {
+    async createGroupConversation(creatorId: string, participantIds: string[], name?: string, description?: string): Promise<string> {
         const allParticipants = [creatorId, ...participantIds.filter(id => id !== creatorId)];
         
         if (allParticipants.length < 2) {
             throw new BadRequestException("Group conversation must have at least 2 participants.");
         }
 
+        const participants = allParticipants.map(userId => ({
+            role: userId === creatorId ? GroupRole.ADMIN : GroupRole.MEMBER,
+            user: { connect: { id: userId } },
+        }));
         const newConversation = await this.prisma.conversation.create({
             data: {
                 type: 'GROUP',
                 name,
+                description,
                 participants: {
-                    create: allParticipants.map(userId => ({ userId })),
+                    create: participants,
                 },
             },
         });
@@ -69,7 +74,7 @@ export class ConversationManager {
     }
 
     async getUserConversations(userId: string, type?: ConversationType): Promise<Conversation[]> {
-        const whereClause:Prisma.ConversationWhereInput= {
+        const whereClause: Prisma.ConversationWhereInput = {
             participants: { some: { userId } }
         };
 
@@ -109,9 +114,10 @@ export class ConversationManager {
         }
 
         await this.prisma.conversationParticipant.create({
-            data:{
+            data: {
                 conversationId,
-                userId
+                userId,
+                role: 'MEMBER'
             }
         });
 

@@ -1,13 +1,17 @@
 import { Injectable } from '@nestjs/common';
 import { WsException } from '@nestjs/websockets';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Conversation, Message } from '@prisma/client';
+import { Message } from '@prisma/client';
+import { ConversationManager } from '../common/utilities/conversation-manager';
 
 @Injectable()
 export class DirectMessageRepository {
-    constructor(private readonly prisma: PrismaService) { }
+    constructor(
+        private readonly prisma: PrismaService,
+        private readonly conversationManager: ConversationManager
+    ) { }
+
     async getActiveSessionforUser(userId: string) {
-        //Remove this get user logic user can't even access gateway without being logged in
         const user = await this.getUser(userId)
         if (!user) {
             throw new WsException("No such User")
@@ -20,68 +24,28 @@ export class DirectMessageRepository {
         })
         return sessions
     }
+
     async getUser(id: string) {
         const user = await this.prisma.user.findFirst({
             where: { id }
         })
         return user
     }
-    async findOrCreateConversation(
-        userId1: string,
-        userId2: string,
-    ): Promise<string> {
-        if (userId1 === userId2) {
-            throw new WsException("Users cannot start a conversation with themselves.");
-        }
 
-        const conversations = await this.prisma.conversation.findMany({
-            where: {
-                AND: [
-                    { participants: { some: { userId: userId1 } } },
-                    { participants: { some: { userId: userId2 } } },
-                ],
-            },
-            include: {
-                _count: {
-                    select: { participants: true },
-                },
-            },
-        });
-
-        const directConversation = conversations.find(c => c.type === "DIRECT");
-
-        if (directConversation) {
-            return directConversation.id;
-        }
-
-        const newConversation = await this.prisma.conversation.create({
-            data: {
-                type: 'DIRECT',
-                participants: {
-                    create: [{ userId: userId1 }, { userId: userId2 }],
-                },
-            },
-        });
-        return newConversation.id;
-        
+    async findOrCreateConversation(userId1: string, userId2: string): Promise<string> {
+        return await this.conversationManager.findOrCreateDirectConversation(userId1, userId2);
     }
-    async findUserConversations(userId: string): Promise<Conversation[]> {
-        return await this.prisma.conversation.findMany({
-            where: {
-                participants: {
-                    some: {
-                        userId
-                    }
-                }
-            }
-        });
+
+    async findUserConversations(userId: string) {
+        return await this.conversationManager.getUserConversations(userId, 'DIRECT');
     }
-    async markAsDelivered(id:string):Promise<void>{
+
+    async markAsDelivered(id: string): Promise<void> {
         await this.prisma.message.update({
-            where:{id},
-            data:{
-                isDelivered:true,
-                deliveredAt:new Date()
+            where: { id },
+            data: {
+                isDelivered: true,
+                deliveredAt: new Date()
             }
         })
     }
@@ -91,24 +55,16 @@ export class DirectMessageRepository {
         senderId: string,
         content: string,
     ): Promise<Message> {
-        const conversation = await this.prisma.conversation.findUnique({
-            where: { id: conversationId },
-            include: { participants: true },
-        });
-
-        if (!conversation) {
-            throw new WsException(
-                `Conversation not found: ${conversationId}`,
-            );
+        const isUserInConversation = await this.conversationManager.isUserInConversation(conversationId, senderId);
+        if (!isUserInConversation) {
+            throw new WsException('User is not part of this conversation');
         }
 
-        const recipient = conversation.participants.find(p => p.userId !== senderId);
+        const participants = await this.conversationManager.getConversationParticipants(conversationId);
+        const recipientId = participants.find(id => id !== senderId);
 
-        if (!recipient) {
-            throw new WsException(
-                'Conversation does not have a valid recipient.'
-            );
-
+        if (!recipientId) {
+            throw new WsException('Conversation does not have a valid recipient.');
         }
 
         const message = await this.prisma.message.create({
@@ -116,7 +72,7 @@ export class DirectMessageRepository {
                 content,
                 conversationId,
                 senderId,
-                recipientId: recipient.userId,
+                recipientId,
                 type: 'TEXT',
             },
             include: {
@@ -129,24 +85,25 @@ export class DirectMessageRepository {
         });
         return message;
     }
+
     async markAsRead(messageId: string, userId: string) {
-    const message = await this.prisma.message.findFirst({
-        where: {
-            id: messageId,
-            recipientId: userId
-        }
-    });
+        const message = await this.prisma.message.findFirst({
+            where: {
+                id: messageId,
+                recipientId: userId
+            }
+        });
 
-    if (!message) {
-        throw new WsException("Message not found or user is not the recipient");
+        if (!message) {
+            throw new WsException("Message not found or user is not the recipient");
+        }
+
+        return await this.prisma.message.update({
+            where: { id: messageId },
+            data: {
+                isRead: true,
+                readAt: new Date()
+            }
+        });
     }
-
-    return await this.prisma.message.update({
-        where: { id: messageId },
-        data: {
-            isRead: true,
-            readAt: new Date()
-        }
-    });
-}
 }
