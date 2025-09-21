@@ -9,10 +9,9 @@ RUN pnpm install --frozen-lockfile
 
 COPY . .
 
-COPY .env .env.development ./
-
+RUN pnpm db:generate
 RUN pnpm run build
 
-EXPOSE 3001
+EXPOSE 3000
 
 CMD ["pnpm", "start:prod"]
