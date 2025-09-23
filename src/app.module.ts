@@ -5,9 +5,10 @@ import { AuthModule } from './auth/auth.module';
 import { DirectMessageModule } from './direct-message/direct-message.module';
 import { MailModule } from './mail/mai.module';
 import { GroupMessageModule } from './group-message/group-message.module';
+import { SessionModule } from './session/session.module';
 
 @Module({
-  imports: [AuthModule, DirectMessageModule,MailModule, GroupMessageModule],
+  imports: [AuthModule, DirectMessageModule,MailModule, GroupMessageModule, SessionModule],
   controllers: [AppController],
   providers: [AppService],
 })

@@ -8,6 +8,12 @@ importers:
 
   .:
     dependencies:
+      '@keyv/redis':
+        specifier: ^5.1.2
+        version: 5.1.2(keyv@5.5.2)
+      '@nestjs/cache-manager':
+        specifier: ^3.0.1
+        version: 3.0.1(@nestjs/common@11.1.6(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(cache-manager@7.2.2)(keyv@5.5.2)(rxjs@7.8.2)
       '@nestjs/common':
         specifier: ^11.0.1
         version: 11.1.6(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -38,12 +44,21 @@ importers:
       bcrypt:
         specifier: ^6.0.0
         version: 6.0.0
+      cache-manager:
+        specifier: ^7.2.2
+        version: 7.2.2
+      cacheable:
+        specifier: ^2.0.2
+        version: 2.0.2
       class-validator:
         specifier: ^0.14.2
         version: 0.14.2
       dotenv:
         specifier: ^17.2.1
         version: 17.2.2
+      keyv:
+        specifier: ^5.5.2
+        version: 5.5.2
       nodemailer:
         specifier: ^7.0.5
         version: 7.0.6
@@ -455,6 +470,15 @@ packages:
   '@borewit/text-codec@0.1.1':
     resolution: {integrity: sha512-5L/uBxmjaCIX5h8Z+uu+kA9BQLkc/Wl06UGR5ajNRxu+/XjonB5i8JpgFMrPj3LXTCPA0pv8yxUvbUi+QthGGA==}
 
+  '@cacheable/memoize@2.0.2':
+    resolution: {integrity: sha512-wPrr7FUiq3Qt4yQyda2/NcOLTJCFcQSU3Am2adP+WLy+sz93/fKTokVTHmtz+rjp4PD7ee0AEOeRVNN6IvIfsg==}
+
+  '@cacheable/memory@2.0.2':
+    resolution: {integrity: sha512-sJTITLfeCI1rg7P3ssaGmQryq235EGT8dXGcx6oZwX5NRnKq9IE6lddlllcOl+oXW+yaeTRddCjo0xrfU6ZySA==}
+
+  '@cacheable/utils@2.0.2':
+    resolution: {integrity: sha512-JTFM3raFhVv8LH95T7YnZbf2YoE9wEtkPPStuRF9a6ExZ103hFvs+QyCuYJ6r0hA9wRtbzgZtwUCoDWxssZd4Q==}
+
   '@colors/colors@1.5.0':
     resolution: {integrity: sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ==}
     engines: {node: '>=0.1.90'}
@@ -768,6 +792,19 @@ packages:
   '@jridgewell/trace-mapping@0.3.9':
     resolution: {integrity: sha512-3Belt6tdc8bPgAtbcmdtNJlirVoTmEb5e2gC94PnkwEW9jI6CAHUeoG85tjWP5WquqfavoMtMwiG4P926ZKKuQ==}
 
+  '@keyv/bigmap@1.0.2':
+    resolution: {integrity: sha512-KR03xkEZlAZNF4IxXgVXb+uNIVNvwdh8UwI0cnc7WI6a+aQcDp8GL80qVfeB4E5NpsKJzou5jU0r6yLSSbMOtA==}
+    engines: {node: '>= 18'}
+
+  '@keyv/redis@5.1.2':
+    resolution: {integrity: sha512-ju+s33Gt8d8xW1aW69CdTvVTQBRmt82PHjcGWsbtsbOh0IcFJ2gsj3bWJVFjn/KYyoqxJSZEpUXlRyv/wq4FMA==}
+    engines: {node: '>= 18'}
+    peerDependencies:
+      keyv: ^5.5.1
+
+  '@keyv/serialize@1.1.1':
+    resolution: {integrity: sha512-dXn3FZhPv0US+7dtJsIi2R+c7qWYiReoEh5zUntWCf4oSpMNib8FDhSoed6m3QyZdx5hK7iLFkYk3rNxwt8vTA==}
+
   '@lukeed/csprng@1.1.0':
     resolution: {integrity: sha512-Z7C/xXCiGWsg0KuKsHTKJxbWhpI3Vs5GwLfOean7MGyVFGqdRgBbAjOCh6u4bbjPc/8MJ2pZmK/0DLdCbivLDA==}
     engines: {node: '>=8'}
@@ -877,6 +914,15 @@ packages:
   '@napi-rs/nice@1.1.1':
     resolution: {integrity: sha512-xJIPs+bYuc9ASBl+cvGsKbGrJmS6fAKaSZCnT0lhahT5rhA2VVy9/EcIgd2JhtEuFOJNx7UHNn/qiTPTY4nrQw==}
     engines: {node: '>= 10'}
+
+  '@nestjs/cache-manager@3.0.1':
+    resolution: {integrity: sha512-4UxTnR0fsmKL5YDalU2eLFVnL+OBebWUpX+hEduKGncrVKH4PPNoiRn1kXyOCjmzb0UvWgqubpssNouc8e0MCw==}
+    peerDependencies:
+      '@nestjs/common': ^9.0.0 || ^10.0.0 || ^11.0.0
+      '@nestjs/core': ^9.0.0 || ^10.0.0 || ^11.0.0
+      cache-manager: '>=6'
+      keyv: '>=5'
+      rxjs: ^7.8.1
 
   '@nestjs/cli@11.0.10':
     resolution: {integrity: sha512-4waDT0yGWANg0pKz4E47+nUrqIJv/UqrZ5wLPkCqc7oMGRMWKAaw1NDZ9rKsaqhqvxb2LfI5+uXOWr4yi94DOQ==}
@@ -1046,6 +1092,10 @@ packages:
 
   '@prisma/get-platform@6.16.2':
     resolution: {integrity: sha512-U/P36Uke5wS7r1+omtAgJpEB94tlT4SdlgaeTc6HVTTT93pXj7zZ+B/cZnmnvjcNPfWddgoDx8RLjmQwqGDYyA==}
+
+  '@redis/client@5.8.2':
+    resolution: {integrity: sha512-WtMScno3+eBpTac1Uav2zugXEoXqaU23YznwvFgkPwBQVwEHTDgOG7uEAObtZ/Nyn8SmAMbqkEubJaMOvnqdsQ==}
+    engines: {node: '>= 18'}
 
   '@sinclair/typebox@0.27.8':
     resolution: {integrity: sha512-+Fj43pSMwJs4KRrH/938Uf+uAELIgVBmQzg/q1YG10djyfA3TnrU8N8XzqCh/okZdszqBQTZf96idMfE5lnwTA==}
@@ -1849,6 +1899,9 @@ packages:
       magicast:
         optional: true
 
+  cache-manager@7.2.2:
+    resolution: {integrity: sha512-kI/pI0+ZX05CsEKH7Dt/mejgWK32R0h/is176IlmcZ6lJls9TdQ/xfYmrBdud7jh2yhlwa8WlBmCW1mjhcBf3g==}
+
   cacheable-lookup@7.0.0:
     resolution: {integrity: sha512-+qJyx4xiKra8mZrcwhjMRMUhD5NR1R8esPkzIYxX96JiecFoxAXFuz/GpR3+ev4PE1WamHip78wV0vcmPQtp8w==}
     engines: {node: '>=14.16'}
@@ -1856,6 +1909,9 @@ packages:
   cacheable-request@10.2.14:
     resolution: {integrity: sha512-zkDT5WAF4hSSoUgyfg5tFIxz8XQK+25W/TLVojJTMKBaxevLBBtLxgqguAuVQB8PVW79FVjHcU+GJ9tVbDZ9mQ==}
     engines: {node: '>=14.16'}
+
+  cacheable@2.0.2:
+    resolution: {integrity: sha512-dWjhLx8RWnPsAWVKwW/wI6OJpQ/hSVb1qS0NUif8TR9vRiSwci7Gey8x04kRU9iAF+Rnbtex5Kjjfg/aB5w8Pg==}
 
   call-bind-apply-helpers@1.0.2:
     resolution: {integrity: sha512-Sp1ablJ0ivDkSzjcaJdxEunN5/XvksFJ2sMBFfq6x0ryhQV/2b/KwFe21cMpmHtPOSij8K99/wSfoEuTObmuMQ==}
@@ -1935,6 +1991,10 @@ packages:
   clone@1.0.4:
     resolution: {integrity: sha512-JQHZ2QMW6l3aH/j6xCqQThY/9OH4D/9ls34cgkUBiEeocRTU04tHfKPBsUK1PqZCUQM7GiA0IIXJSuXHI64Kbg==}
     engines: {node: '>=0.8'}
+
+  cluster-key-slot@1.1.2:
+    resolution: {integrity: sha512-RMr0FhtfXemyinomL4hrWcYJxmX6deFdCxpJzhDttxgO1+bcCnkk+9drydLVDmAMG7NE6aN/fl4F7ucU/90gAA==}
+    engines: {node: '>=0.10.0'}
 
   co@4.6.0:
     resolution: {integrity: sha512-QVb0dM5HvG+uaxitm8wONl7jltx8dqhfU33DcqtOZcLSVIKSDDLDi7+0LbAKiyI8hD9u42m2YxXSkMGWThaecQ==}
@@ -2570,6 +2630,9 @@ packages:
     resolution: {integrity: sha512-0hJU9SCPvmMzIBdZFqNPXWa6dqh7WdH0cII9y+CyS8rG3nL48Bclra9HmKhVVUHyPWNH5Y7xDwAB7bfgSjkUMQ==}
     engines: {node: '>= 0.4'}
 
+  hookified@1.12.1:
+    resolution: {integrity: sha512-xnKGl+iMIlhrZmGHB729MqlmPoWBznctSQTYCpFKqNsCgimJQmithcW0xSQMMFzYnV2iKUh25alswn6epgxS0Q==}
+
   html-escaper@2.0.2:
     resolution: {integrity: sha512-H2iMtd0I4Mt5eYiapRdIDjp+XzelXQ0tFE4JS7YFwFevXXMmOp9myNrUvCg0D6ws8iqkRPBfKHgbwig1SmlLfg==}
 
@@ -2906,6 +2969,9 @@ packages:
 
   keyv@4.5.4:
     resolution: {integrity: sha512-oxVHkHR/EJf2CNXnWxRLW6mg7JyCCUcG0DtEGmL2ctUo1PNTin1PUil+r/+4r5MpVgC/fn1kjsx7mjSujKqIpw==}
+
+  keyv@5.5.2:
+    resolution: {integrity: sha512-TXcFHbmm/z7MGd1u9ASiCSfTS+ei6Z8B3a5JHzx3oPa/o7QzWVtPRpc4KGER5RR469IC+/nfg4U5YLIuDUua2g==}
 
   kind-of@6.0.3:
     resolution: {integrity: sha512-dcS1ul+9tmeD95T+x28/ehLgd9mENa3LsvDTtzm3vyBEO7RPptvAD+t44WVXaUjTBRcrpFeFlC8WCruUR456hw==}
@@ -4610,6 +4676,20 @@ snapshots:
 
   '@borewit/text-codec@0.1.1': {}
 
+  '@cacheable/memoize@2.0.2':
+    dependencies:
+      '@cacheable/utils': 2.0.2
+
+  '@cacheable/memory@2.0.2':
+    dependencies:
+      '@cacheable/memoize': 2.0.2
+      '@cacheable/utils': 2.0.2
+      '@keyv/bigmap': 1.0.2
+      hookified: 1.12.1
+      keyv: 5.5.2
+
+  '@cacheable/utils@2.0.2': {}
+
   '@colors/colors@1.5.0':
     optional: true
 
@@ -5028,6 +5108,19 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
+  '@keyv/bigmap@1.0.2':
+    dependencies:
+      hookified: 1.12.1
+
+  '@keyv/redis@5.1.2(keyv@5.5.2)':
+    dependencies:
+      '@redis/client': 5.8.2
+      cluster-key-slot: 1.1.2
+      hookified: 1.12.1
+      keyv: 5.5.2
+
+  '@keyv/serialize@1.1.1': {}
+
   '@lukeed/csprng@1.1.0': {}
 
   '@napi-rs/nice-android-arm-eabi@1.1.1':
@@ -5101,6 +5194,14 @@ snapshots:
       '@napi-rs/nice-win32-ia32-msvc': 1.1.1
       '@napi-rs/nice-win32-x64-msvc': 1.1.1
     optional: true
+
+  '@nestjs/cache-manager@3.0.1(@nestjs/common@11.1.6(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/core@11.1.6)(cache-manager@7.2.2)(keyv@5.5.2)(rxjs@7.8.2)':
+    dependencies:
+      '@nestjs/common': 11.1.6(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@nestjs/core': 11.1.6(@nestjs/common@11.1.6(class-validator@0.14.2)(reflect-metadata@0.2.2)(rxjs@7.8.2))(@nestjs/platform-express@11.1.6)(@nestjs/websockets@11.1.6)(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      cache-manager: 7.2.2
+      keyv: 5.5.2
+      rxjs: 7.8.2
 
   '@nestjs/cli@11.0.10(@swc/cli@0.6.0(@swc/core@1.13.5)(chokidar@4.0.3))(@swc/core@1.13.5)(@types/node@22.18.6)':
     dependencies:
@@ -5306,6 +5407,10 @@ snapshots:
   '@prisma/get-platform@6.16.2':
     dependencies:
       '@prisma/debug': 6.16.2
+
+  '@redis/client@5.8.2':
+    dependencies:
+      cluster-key-slot: 1.1.2
 
   '@sinclair/typebox@0.27.8': {}
 
@@ -6362,6 +6467,11 @@ snapshots:
       pkg-types: 2.3.0
       rc9: 2.1.2
 
+  cache-manager@7.2.2:
+    dependencies:
+      '@cacheable/utils': 2.0.2
+      keyv: 5.5.2
+
   cacheable-lookup@7.0.0: {}
 
   cacheable-request@10.2.14:
@@ -6373,6 +6483,14 @@ snapshots:
       mimic-response: 4.0.0
       normalize-url: 8.1.0
       responselike: 3.0.0
+
+  cacheable@2.0.2:
+    dependencies:
+      '@cacheable/memoize': 2.0.2
+      '@cacheable/memory': 2.0.2
+      '@cacheable/utils': 2.0.2
+      hookified: 1.12.1
+      keyv: 5.5.2
 
   call-bind-apply-helpers@1.0.2:
     dependencies:
@@ -6442,6 +6560,8 @@ snapshots:
       wrap-ansi: 7.0.0
 
   clone@1.0.4: {}
+
+  cluster-key-slot@1.1.2: {}
 
   co@4.6.0: {}
 
@@ -7117,6 +7237,8 @@ snapshots:
     dependencies:
       function-bind: 1.1.2
 
+  hookified@1.12.1: {}
+
   html-escaper@2.0.2: {}
 
   http-cache-semantics@4.2.0: {}
@@ -7629,6 +7751,10 @@ snapshots:
   keyv@4.5.4:
     dependencies:
       json-buffer: 3.0.1
+
+  keyv@5.5.2:
+    dependencies:
+      '@keyv/serialize': 1.1.1
 
   kind-of@6.0.3: {}
 

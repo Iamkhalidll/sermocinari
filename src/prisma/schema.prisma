@@ -22,7 +22,6 @@ model User {
   lastSeen              DateTime                  @default(now())
   createdAt             DateTime                  @default(now())
   updatedAt             DateTime                  @updatedAt
-  sessions              Session[]
   messages              Message[]
   received              Message[]                 @relation("ReceivedMessages")
   conversations         ConversationParticipant[]
@@ -33,13 +32,6 @@ model User {
   @@index([verificationOtp])
 }
 
-model Session {
-  id        String   @id @default(uuid())
-  socketId  String   @unique
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  createdAt DateTime @default(now())
-}
 
 model Conversation {
   id        String   @id @default(uuid())

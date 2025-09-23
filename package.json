@@ -23,6 +23,8 @@
     "db:deploy ": "prisma migrate deploy --schema=src/prisma/schema.prisma"
   },
   "dependencies": {
+    "@keyv/redis": "^5.1.2",
+    "@nestjs/cache-manager": "^3.0.1",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.1",
@@ -33,8 +35,11 @@
     "@nestjs/websockets": "^11.1.6",
     "@prisma/client": "^6.14.0",
     "bcrypt": "^6.0.0",
+    "cache-manager": "^7.2.2",
+    "cacheable": "^2.0.2",
     "class-validator": "^0.14.2",
     "dotenv": "^17.2.1",
+    "keyv": "^5.5.2",
     "nodemailer": "^7.0.5",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
