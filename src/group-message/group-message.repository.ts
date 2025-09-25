@@ -2,23 +2,20 @@ import { Injectable } from '@nestjs/common';
 import { WsException } from '@nestjs/websockets';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { ConversationManager } from '../common/utilities/conversation-manager';
+import { SessionService } from '../session/session.service';
 import { createGroup } from './group-message.service';
 
 @Injectable()
 export class GroupMessageRepository {
     constructor(
         private readonly prisma: PrismaService,
-        private readonly conversationManager: ConversationManager
+        private readonly conversationManager: ConversationManager,
+        private readonly sessionService: SessionService
     ) { }
 
     async getActiveSessionforUser(userId: string) {
-        const sessions = await this.prisma.session.findMany({
-            where: {
-                userId
-            },
-            orderBy: { createdAt: "desc" }
-        })
-        return sessions
+        const sessions = await this.sessionService.getUserSessions(userId);
+        return sessions;
     }
 
     async createGroup(userId: string, createGroup: createGroup) {

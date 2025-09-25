@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { AuthenticatedSocket } from '../middleware/ws-auth.middleware';
 import { ConversationManager } from './conversation-manager';
+import { SessionService } from '../../session/session.service';
 
 export type ConversationType = 'DIRECT' | 'GROUP';
 
@@ -11,12 +12,13 @@ export class ConnectionManager {
 
     constructor(
         private readonly prisma: PrismaService,
-        private readonly conversationManager:ConversationManager
+        private readonly conversationManager: ConversationManager,
+        private readonly sessionService: SessionService
     ) {}
 
     async connect(client: AuthenticatedSocket, conversationType: ConversationType) {
         try {
-            await this.createSessionAndUpdateStatus(client.user.id, client.id);
+            await this.createSessionAndUpdateStatus(client.user.id, client.id, conversationType);
             await this.deliverPendingMessages(client);
             await this.joinUserConversations(client, conversationType);
             
@@ -30,15 +32,15 @@ export class ConnectionManager {
 
     async disconnect(socketId: string) {
         try {
-            const session = await this.prisma.session.delete({
-                where: { socketId }
-            });
+            const session = await this.sessionService.getSession(socketId);
+            if (!session) {
+                this.logger.warn(`Session not found for socket: ${socketId}`);
+                return;
+            }
+            await this.sessionService.removeSession(socketId);
+            const hasActiveSessions = await this.sessionService.hasActiveSessions(session.userId);
 
-            const activeSessions = await this.prisma.session.findMany({
-                where: { userId: session.userId }
-            });
-
-            if (activeSessions.length === 0) {
+            if (!hasActiveSessions) {
                 await this.prisma.user.update({
                     where: { id: session.userId },
                     data: {
@@ -77,22 +79,17 @@ export class ConnectionManager {
         }
     }
 
-    private async createSessionAndUpdateStatus(userId: string, socketId: string) {
-        return this.prisma.$transaction(async (tx) => {
-            const session = await tx.session.create({
-                data: { socketId, userId }
-            });
-
-            await tx.user.update({
-                where: { id: userId },
-                data: {
-                    isOnline: true,
-                    lastSeen: new Date(),
-                },
-            });
-
-            return session;
+    private async createSessionAndUpdateStatus(userId: string, socketId: string, conversationType: ConversationType) {
+        await this.sessionService.createSession(userId, socketId, conversationType);
+        await this.prisma.user.update({
+            where: { id: userId },
+            data: {
+                isOnline: true,
+                lastSeen: new Date(),
+            },
         });
+
+        return { socketId, userId };
     }
 
     private async joinUserConversations(client: AuthenticatedSocket, conversationType: ConversationType) {

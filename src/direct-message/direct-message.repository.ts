@@ -3,33 +3,30 @@ import { WsException } from '@nestjs/websockets';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Message } from '@prisma/client';
 import { ConversationManager } from '../common/utilities/conversation-manager';
+import { SessionService } from '../session/session.service';
 
 @Injectable()
 export class DirectMessageRepository {
     constructor(
         private readonly prisma: PrismaService,
-        private readonly conversationManager: ConversationManager
+        private readonly conversationManager: ConversationManager,
+        private readonly sessionService: SessionService
     ) { }
 
     async getActiveSessionforUser(userId: string) {
-        const user = await this.getUser(userId)
+        const user = await this.getUser(userId);
         if (!user) {
-            throw new WsException("No such User")
+            throw new WsException("No such User");
         }
-        const sessions = await this.prisma.session.findMany({
-            where: {
-                userId
-            },
-            orderBy: { createdAt: "desc" }
-        })
-        return sessions
+        return await this.sessionService.getUserSessions(userId);
+       
     }
 
     async getUser(id: string) {
         const user = await this.prisma.user.findFirst({
             where: { id }
-        })
-        return user
+        });
+        return user;
     }
 
     async findOrCreateConversation(userId1: string, userId2: string): Promise<string> {
@@ -47,7 +44,7 @@ export class DirectMessageRepository {
                 isDelivered: true,
                 deliveredAt: new Date()
             }
-        })
+        });
     }
 
     async createTextMessage(
