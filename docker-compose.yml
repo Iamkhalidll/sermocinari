@@ -3,7 +3,7 @@ services:
     build: .
     env_file:
       - .env
-    container_name: simple-chat-app
+    container_name: sermocinari
     restart: always
     ports:
       - "3000:3000"
@@ -12,10 +12,16 @@ services:
       - /usr/src/app/node_modules
     depends_on:
       - redis
+      - postgres 
     environment:
       REDIS_HOST: redis
       REDIS_PORT: 6379
-    command: pnpm run start:dev
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: sermocinari_user
+      POSTGRES_PASSWORD: strongpassword123
+      POSTGRES_DB: sermocinari
+    command: pnpm  start:dev
 
   redis:
     image: redis:7-alpine
@@ -23,3 +29,20 @@ services:
     restart: always
     ports:
       - "6379:6379"
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: sermocinari_user 
+      POSTGRES_PASSWORD: strongpassword123
+      POSTGRES_DB: sermocinari 
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
+
