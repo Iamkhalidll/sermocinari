@@ -4,13 +4,11 @@ import { CallType, CallStatus } from '@prisma/client';
 
 @Injectable()
 export class CallRepository {
-    constructor(
-        private readonly prisma: PrismaService,
-    ) { }
+    constructor(private readonly prisma: PrismaService) {}
 
     async verifyUser(userId: string): Promise<boolean> {
         const user = await this.prisma.user.findUnique({
-            where: { id: userId }
+            where: { id: userId },
         });
         return !!user;
     }
@@ -18,7 +16,7 @@ export class CallRepository {
     async initiateCall(
         callerId: string,
         type: CallType,
-        conversationId: string
+        conversationId: string,
     ): Promise<string> {
         const call = await this.prisma.call.create({
             data: {
@@ -26,7 +24,7 @@ export class CallRepository {
                 type,
                 conversationId,
                 status: CallStatus.INITIATED,
-            }
+            },
         });
         return call.id;
     }
@@ -34,16 +32,14 @@ export class CallRepository {
     async acceptCall(callId: string, acceptorId: string): Promise<void> {
         await this.prisma.call.update({
             where: { id: callId },
-            data: {
-                status: CallStatus.ACTIVE
-            }
+            data: { status: CallStatus.ACTIVE },
         });
 
         await this.prisma.callParticipant.create({
             data: {
                 callId,
                 userId: acceptorId,
-            }
+            },
         });
     }
 
@@ -53,12 +49,12 @@ export class CallRepository {
             data: {
                 status: CallStatus.ENDED,
                 endedAt: new Date(),
-            }
+            },
         });
     }
 
     async getCall(callId: string) {
-        return await this.prisma.call.findUnique({
+        return this.prisma.call.findUnique({
             where: { id: callId },
             include: {
                 participants: true,
@@ -67,7 +63,7 @@ export class CallRepository {
                         id: true,
                         name: true,
                         avatar: true,
-                    }
+                    },
                 },
                 conversation: {
                     include: {
@@ -78,18 +74,18 @@ export class CallRepository {
                                         id: true,
                                         name: true,
                                         avatar: true,
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+                                    },
+                                },
+                            },
+                        },
+                    },
+                },
+            },
         });
     }
 
     async getCallsByConversation(conversationId: string) {
-        return await this.prisma.call.findMany({
+        return this.prisma.call.findMany({
             where: { conversationId },
             include: {
                 participants: {
@@ -99,21 +95,21 @@ export class CallRepository {
                                 id: true,
                                 name: true,
                                 avatar: true,
-                            }
-                        }
-                    }
+                            },
+                        },
+                    },
                 },
                 initiator: {
                     select: {
                         id: true,
                         name: true,
                         avatar: true,
-                    }
-                }
+                    },
+                },
             },
             orderBy: {
-                startedAt: 'desc'
-            }
+                startedAt: 'desc',
+            },
         });
     }
 }

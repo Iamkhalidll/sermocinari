@@ -23,10 +23,6 @@ export class CallService {
             throw new WsException('User is not online');
         }
 
-        if (!await this.callRepository.verifyUser(callerId)) {
-            throw new WsException('Caller does not exist');
-        }
-
         if (!await this.callRepository.verifyUser(calleeId)) {
             throw new WsException('Callee does not exist');
         }
