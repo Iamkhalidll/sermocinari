@@ -4,7 +4,7 @@ import {
 } from '@nestjs/common';
 import { WsException } from '@nestjs/websockets';
 import { DirectMessageRepository } from './direct-message.repository';
-import { ConversationManager } from '../common/utilities/conversation-manager'; // <-- New import/dependency
+import { ConversationManager } from '../common/utilities/conversation-manager';
 
 @Injectable()
 export class DirectMessageService {
@@ -13,7 +13,13 @@ export class DirectMessageService {
         private readonly directMessageRepository: DirectMessageRepository,
         private readonly conversationManager: ConversationManager,
     ) { }
-
+    private handleError(error: unknown, contextMessage: string): never {
+        this.logger.error(error);
+        if (error instanceof WsException) {
+            throw error;
+        }
+        throw new WsException(contextMessage);
+    }
 
     async startConversation(
         fromUserId: string,
@@ -29,11 +35,7 @@ export class DirectMessageService {
             }
             return roomId;
         } catch (error) {
-            this.logger.log(error);
-            if (error instanceof WsException) {
-                throw error;
-            }
-            throw new WsException('An unexpected error occurred');
+            this.handleError(error, 'An unexpected error occurred');
         }
     }
 
@@ -41,11 +43,7 @@ export class DirectMessageService {
         try {
             return await this.directMessageRepository.getActiveSessionforUser(userId);
         } catch (error) {
-            this.logger.error(error);
-            if (error instanceof WsException) {
-                throw error;
-            }
-            throw new WsException('Could not fetch user sessions');
+            this.handleError(error, 'Could not fetch user sessions');
         }
     }
 
@@ -61,11 +59,7 @@ export class DirectMessageService {
         try {
             return await this.directMessageRepository.markAsRead(messageId, userId);
         } catch (error) {
-            this.logger.error(error);
-            if (error instanceof WsException) {
-                throw error;
-            }
-            throw new WsException('An unexpected error occurred');
+            this.handleError(error, 'An unexpected error occurred');
         }
     }
 
@@ -79,7 +73,6 @@ export class DirectMessageService {
             if (!isUserInConversation) {
                 throw new WsException('User is not part of this conversation');
             }
-
             const participants = await this.conversationManager.getConversationParticipants(conversationId);
             const recipientId = participants.find(id => id !== senderId);
 
@@ -95,29 +88,25 @@ export class DirectMessageService {
             );
             return message;
         } catch (error) {
-            this.logger.log(error);
-            if (error instanceof WsException) {
-                throw error;
-            }
-            throw new WsException('Could not send message');
+            this.handleError(error, 'Could not send message');
         }
     }
 
     async verifyUserAndGetRecipient(conversationId: string, userId: string): Promise<string> {
         try {
-            if (await this.conversationManager.isUserInConversation(conversationId, userId)) {
+            if (!(await this.conversationManager.isUserInConversation(conversationId, userId))) {
                 throw new WsException('User is not part of this conversation');
             }
+
             const participants = await this.conversationManager.getConversationParticipants(conversationId);
             const recipient = participants.filter(id => id !== userId);
-            return recipient[0];
 
-        } catch (error) {
-            this.logger.log(error);
-            if (error instanceof WsException) {
-                throw error;
+            if (recipient.length !== 1) {
+                throw new WsException('Conversation format error: expecting exactly one recipient.');
             }
-            throw new WsException('Could not send message');
+            return recipient[0];
+        } catch (error) {
+            this.handleError(error, 'Could not verify user or find recipient');
         }
     }
 }

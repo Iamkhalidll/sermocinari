@@ -115,4 +115,18 @@ export class GroupMessageService {
             this.handleError(error);
         }
     }
+
+    async verifyUserInGroup(userId: string, groupId: string) {
+        try{
+            const isUserInGroup = await this.conversationManager.isUserInConversation(groupId, userId);
+            if(!isUserInGroup){
+                throw new WsException("Group doesn't exist or User isn't in group");
+            }
+            return true;
+        }
+        catch(error){
+            this.handleError(error);
+        }
+
+}
 }

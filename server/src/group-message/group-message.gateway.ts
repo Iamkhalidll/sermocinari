@@ -10,6 +10,7 @@ import { SessionService } from 'src/session/session.service';
 @WebSocketGateway()
 export class GroupMessageGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @WebSocketServer() server: Server;
+    private typingUsers = new Map<string, Set<string>>();
     private readonly logger = new Logger(GroupMessageGateway.name)
     constructor(
         private readonly wsAuthMiddleware: WsAuthMiddleware,
@@ -135,4 +136,49 @@ export class GroupMessageGateway implements OnGatewayConnection, OnGatewayDiscon
         client.emit('left-group', { groupId: payload.groupId });
         this.server.to(payload.groupId).emit('member-left', { groupId: payload.groupId, memberId: client.user.id });
     }
+
+    @SubscribeMessage('typing_started')
+  async typingStarted(
+    @MessageBody() payload: { groupId: string },
+    @ConnectedSocket() client: AuthenticatedSocket
+  ) {
+    await this.groupMessageService.verifyUserInGroup(client.user.id, payload.groupId);
+    
+    if (!this.typingUsers.has(payload.groupId)) {
+      this.typingUsers.set(payload.groupId, new Set());
+    }
+    this.typingUsers.get(payload.groupId).add(client.user.id);
+    
+    const typingUserIds = Array.from(this.typingUsers.get(payload.groupId));
+    
+    client.to(payload.groupId).emit('users-typing', { 
+      groupId: payload.groupId, 
+      userIds: typingUserIds 
+    });
+  }
+
+  @SubscribeMessage('typing_stopped')
+  async typingStopped(
+    @MessageBody() payload: { groupId: string },
+    @ConnectedSocket() client: AuthenticatedSocket
+  ) {
+    await this.groupMessageService.verifyUserInGroup(client.user.id, payload.groupId);
+    
+    if (this.typingUsers.has(payload.groupId)) {
+      this.typingUsers.get(payload.groupId).delete(client.user.id);
+      
+      if (this.typingUsers.get(payload.groupId).size === 0) {
+        this.typingUsers.delete(payload.groupId);
+      }
+    }
+    
+    const typingUserIds = this.typingUsers.has(payload.groupId) 
+      ? Array.from(this.typingUsers.get(payload.groupId))
+      : [];
+    
+    client.to(payload.groupId).emit('users-typing', { 
+      groupId: payload.groupId, 
+      userIds: typingUserIds 
+    });
+  }
 }

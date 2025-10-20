@@ -22,7 +22,7 @@ export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisco
     private readonly directMessageService: DirectMessageService,
     private readonly wsAuthMiddleware: WsAuthMiddleware,
     private readonly connectionManager: ConnectionManager,
-  ) {}
+  ) { }
 
   afterInit(server: Server) {
     server.use(this.wsAuthMiddleware.use);
@@ -40,7 +40,7 @@ export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisco
    *  Utility: emit an event to all active sessions of a user
    * -------------------------------------------------- */
 
-  private async emitToUserSockets<T extends {conversationId?:string}>(
+  private async emitToUserSockets<T extends { conversationId?: string }>(
     userId: string,
     event: string,
     data: T,
@@ -139,25 +139,31 @@ export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisco
     @MessageBody() payload: { conversationId: string },
     @ConnectedSocket() client: AuthenticatedSocket,
   ) {
-    const recipientId = await this.directMessageService.verifyUserAndGetRecipient(payload.conversationId, client.user.id);
+    const recipientId = await this.directMessageService.verifyUserAndGetRecipient(
+      payload.conversationId,
+      client.user.id
+    );
+
     await this.emitToUserSockets(recipientId, 'user-typing', {
       conversationId: payload.conversationId,
       userId: client.user.id,
     });
-  
-}
-    @SubscribeMessage('typing_stopped')
-    async handleTypingStopped(
-      @MessageBody() payload: { conversationId: string },
-      @ConnectedSocket() client: AuthenticatedSocket,
-    ) {
-      const recipientId = await this.directMessageService.verifyUserAndGetRecipient(payload.conversationId, client.user.id);
-      await this.emitToUserSockets(recipientId, 'user-stopped-typing', {
-        conversationId: payload.conversationId,
-        userId: client.user.id,
-      });
+  }
 
+  @SubscribeMessage('typing_stopped')
+  async handleTypingStopped(
+    @MessageBody() payload: { conversationId: string },
+    @ConnectedSocket() client: AuthenticatedSocket,
+  ) {
+    const recipientId = await this.directMessageService.verifyUserAndGetRecipient(
+      payload.conversationId,
+      client.user.id
+    );
 
-}
+    await this.emitToUserSockets(recipientId, 'user-stopped-typing', {
+      conversationId: payload.conversationId,
+      userId: client.user.id,
+    });
+  }
 
 }
