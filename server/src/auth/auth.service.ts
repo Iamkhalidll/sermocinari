@@ -1,4 +1,3 @@
-// src/auth/auth.service.ts
 import {
   Injectable,
   ConflictException,
@@ -30,7 +29,7 @@ export class AuthService {
   }
 
   async signup(signupDto: SignupDto) {
-    const { name, email, password } = signupDto;
+    const { name, email, password,avatar } = signupDto;
 
     const existingUser = await this.authRepository.findUserByEmail(email);
     if (existingUser) {
@@ -44,6 +43,7 @@ export class AuthService {
     const user = await this.authRepository.createUser({
       name,
       email,
+      avatar,
       password: hashedPassword,
       verificationOtp: otp,
       otpExpiry,

@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 export interface CreateUserData {
   name: string;
   email: string;
+  avatar?: string;
   password: string;
   verificationOtp: string;
   otpExpiry: Date;
