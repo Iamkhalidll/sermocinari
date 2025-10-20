@@ -1,131 +1,163 @@
 import { Logger } from '@nestjs/common';
 import {
-    ConnectedSocket,
-    MessageBody,
-    OnGatewayConnection,
-    OnGatewayDisconnect,
-    SubscribeMessage,
-    WebSocketGateway,
-    WebSocketServer,
+  ConnectedSocket,
+  MessageBody,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  SubscribeMessage,
+  WebSocketGateway,
+  WebSocketServer,
 } from '@nestjs/websockets';
 import { Server } from 'socket.io';
-import { AuthenticatedSocket, WsAuthMiddleware } from '../common/middleware/ws-auth.middleware'
+import { AuthenticatedSocket, WsAuthMiddleware } from '../common/middleware/ws-auth.middleware';
 import { DirectMessageService } from './direct-message.service';
 import { ConnectionManager } from 'src/common/utilities/connection-manager';
 
 @WebSocketGateway(3001, { cors: { origin: '*' } })
 export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisconnect {
-    @WebSocketServer() server: Server;
-    private readonly logger = new Logger(DirectMessageGateway.name);
-    constructor(
-        private readonly directMessageService: DirectMessageService,
-        private readonly wsAuthMiddleware: WsAuthMiddleware,
-        private readonly connectionManager: ConnectionManager
-    ) { }
+  @WebSocketServer() server: Server;
+  private readonly logger = new Logger(DirectMessageGateway.name);
 
-    afterInit(server: Server) {
-        server.use(this.wsAuthMiddleware.use);
-    }
-    async handleConnection(client: AuthenticatedSocket) {
-        await this.connectionManager.connect(client, 'DIRECT')
+  constructor(
+    private readonly directMessageService: DirectMessageService,
+    private readonly wsAuthMiddleware: WsAuthMiddleware,
+    private readonly connectionManager: ConnectionManager,
+  ) {}
 
+  afterInit(server: Server) {
+    server.use(this.wsAuthMiddleware.use);
+  }
+
+  async handleConnection(client: AuthenticatedSocket) {
+    await this.connectionManager.connect(client, 'DIRECT');
+  }
+
+  async handleDisconnect(@ConnectedSocket() client: AuthenticatedSocket) {
+    await this.connectionManager.disconnect(client.id);
+  }
+
+  /** --------------------------------------------------
+   *  Utility: emit an event to all active sessions of a user
+   * -------------------------------------------------- */
+
+  private async emitToUserSockets<T extends {conversationId?:string}>(
+    userId: string,
+    event: string,
+    data: T,
+    joinRoom = false,
+  ) {
+    const sessions = await this.directMessageService.getUserSockets(userId);
+
+    for (const session of sessions) {
+      const socket = this.server.sockets.sockets.get(session.socketId);
+      if (!socket) continue;
+
+      if (joinRoom && data?.conversationId) {
+        await socket.join(data.conversationId);
+        this.logger.log(`User ${userId} (${session.socketId}) joined room ${data.conversationId}`);
+      } else {
+        socket.emit(event, data);
+      }
     }
-    async handleDisconnect(@ConnectedSocket() client: AuthenticatedSocket) {
-        await this.connectionManager.disconnect(client.id)
+  }
+
+  @SubscribeMessage('start-conversation')
+  async startConversation(
+    @MessageBody() payload: { toUserId: string },
+    @ConnectedSocket() client: AuthenticatedSocket,
+  ) {
+    const senderId = client.user.id;
+    const recipientId = payload.toUserId;
+
+    const conversationId = await this.directMessageService.startConversation(senderId, recipientId);
+
+    await client.join(conversationId);
+    this.logger.log(`Sender ${senderId} (${client.id}) joined room ${conversationId}`);
+
+    await this.emitToUserSockets(recipientId, 'joined-room', { conversationId }, true);
+
+    return {
+      status: 'OK',
+      conversationId,
+    };
+  }
+
+  @SubscribeMessage('mark-as-read')
+  async markAsRead(
+    @MessageBody() payload: { messageId: string },
+    @ConnectedSocket() client: AuthenticatedSocket,
+  ) {
+    const updatedMessage = await this.directMessageService.markAsRead(payload.messageId, client.user.id);
+
+    await this.emitToUserSockets(updatedMessage.senderId, 'message-read', {
+      conversationId: updatedMessage.conversationId,
+      messageId: payload.messageId,
+      readBy: client.user.id,
+      readAt: updatedMessage.readAt,
+    });
+
+    this.logger.log(`Message ${payload.messageId} marked as read by ${client.user.id}`);
+  }
+
+  @SubscribeMessage('send-direct-message')
+  async handleDirectMessage(
+    @MessageBody() payload: { conversationId: string; content: string },
+    @ConnectedSocket() client: AuthenticatedSocket,
+  ) {
+    const { conversationId, content } = payload;
+    const senderId = client.user.id;
+
+    const message = await this.directMessageService.sendTextMessage(conversationId, senderId, content);
+
+    client.emit('message-sent', { ...message, isDelivered: false, deliveredAt: null });
+
+    const recipientId = message.recipientId as string;
+    const recipientSessions = await this.directMessageService.getUserSockets(recipientId);
+
+    if (recipientSessions.length > 0) {
+      await this.emitToUserSockets(recipientId, 'new-direct-message', message);
+      this.logger.log(`Message delivered from ${senderId} sent to ${recipientId}`);
+
+      await this.directMessageService.markAsDelivered(message.id);
+
+      client.emit('message-delivered', {
+        messageId: message.id,
+        deliveredAt: new Date(),
+      });
+    } else {
+      this.server.to(conversationId).emit('new-direct-message', message);
     }
 
-    @SubscribeMessage('start-conversation')
-    async startConversation(
-        @MessageBody() payload: { toUserId: string },
-        @ConnectedSocket() client: AuthenticatedSocket,
+    return {
+      status: 'Message Sent',
+      message,
+    };
+  }
+
+  @SubscribeMessage('typing_started')
+  async handleTypingStarted(
+    @MessageBody() payload: { conversationId: string },
+    @ConnectedSocket() client: AuthenticatedSocket,
+  ) {
+    const recipientId = await this.directMessageService.verifyUserAndGetRecipient(payload.conversationId, client.user.id);
+    await this.emitToUserSockets(recipientId, 'user-typing', {
+      conversationId: payload.conversationId,
+      userId: client.user.id,
+    });
+  
+}
+    @SubscribeMessage('typing_stopped')
+    async handleTypingStopped(
+      @MessageBody() payload: { conversationId: string },
+      @ConnectedSocket() client: AuthenticatedSocket,
     ) {
-        const senderId = client.user.id;
-        const recipientId = payload.toUserId;
+      const recipientId = await this.directMessageService.verifyUserAndGetRecipient(payload.conversationId, client.user.id);
+      await this.emitToUserSockets(recipientId, 'user-stopped-typing', {
+        conversationId: payload.conversationId,
+        userId: client.user.id,
+      });
 
-        const conversationId = await this.directMessageService.startConversation(
-            senderId,
-            recipientId,
-        );
 
-        await client.join(conversationId);
-        this.logger.log(
-            `Sender ${senderId} (${client.id}) joined room ${conversationId}`,
-        );
+}
 
-        const recipientSessions = await this.directMessageService.getUserSockets(recipientId);
-        console.log(recipientSessions)
-        if (recipientSessions.length > 0) {
-            for (const session of recipientSessions) {
-                const recipientSocket = this.server.sockets.sockets.get(session.socketId);
-                if (recipientSocket) {
-                    await recipientSocket.join(conversationId);
-                    this.logger.log(`Recipient ${recipientId} (${session.socketId}) joined room ${conversationId}`);
-                }
-            }
-        }
-        return {
-            status: 'OK',
-            conversationId,
-        };
-    }
-    @SubscribeMessage('mark-as-read')
-    async markAsRead(
-        @MessageBody() payload: { messageId: string },
-        @ConnectedSocket() client: AuthenticatedSocket,
-    ) {
-        const updatedMessage = await this.directMessageService.markAsRead(payload.messageId, client.user.id);
-
-        const senderSessions = await this.directMessageService.getUserSockets(updatedMessage.senderId);
-
-        for (const session of senderSessions) {
-            const senderSocket = this.server.sockets.sockets.get(session.socketId);
-            if (senderSocket) {
-                senderSocket.emit('message-read', {
-                    messageId: payload.messageId,
-                    readBy: client.user.id,
-                    readAt: updatedMessage.readAt
-                });
-            }
-        }
-
-        this.logger.log(`Message ${payload.messageId} marked as read by ${client.user.id}`);
-    }
-    @SubscribeMessage('send-direct-message')
-    async handleDirectMessage(
-        @MessageBody() payload: { conversationId: string; content: string },
-        @ConnectedSocket() client: AuthenticatedSocket,
-    ) {
-        const { conversationId, content } = payload;
-        const senderId = client.user.id;
-
-        const message = await this.directMessageService.sendTextMessage(
-            conversationId,
-            senderId,
-            content,
-        );
-        client.emit('message-sent', {
-            ...message,
-            isDelivered: false,
-            deliveredAt: null,
-        }); const recipientSessions = await this.directMessageService.getUserSockets(message.recipientId as string)
-        if (recipientSessions.length > 0) {
-            for (const session of recipientSessions) {
-                const recipientSocket = this.server.sockets.sockets.get(session.socketId);
-                if (recipientSocket) {
-                    recipientSocket.emit('new-direct-message', message);
-                }
-            }
-            this.logger.log(`Message delivered from ${senderId} sent to ${message.recipientId}`);
-            await this.directMessageService.markAsDelivered(message.id);
-            client.emit('message-delivered', {
-                messageId: message.id,
-                deliveredAt: new Date(),
-            });
-        } else { this.server.to(conversationId).emit('new-direct-message', message); }
-
-        return {
-            status: 'Message Sent',
-            message,
-        };
-    }
 }
