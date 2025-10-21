@@ -28,7 +28,7 @@ export class GroupMessageGateway implements OnGatewayConnection, OnGatewayDiscon
         await this.connectionManager.disconnect(client.id)
     }
 
-    @SubscribeMessage('create-group')
+    @SubscribeMessage('chat:group.create')
     async createGroup(
         @MessageBody() payload: { name: string, description: string, members?: string[] },
         @ConnectedSocket() client: AuthenticatedSocket
@@ -37,7 +37,7 @@ export class GroupMessageGateway implements OnGatewayConnection, OnGatewayDiscon
         this.logger.log(`Group with id ${groupId} created successfully by ${client.user.id}`);
 
         await client.join(groupId);
-        client.emit('group-created', { groupId });
+        client.emit('chat:group.created', { groupId });
 
         if (payload.members) {
             for (const memberId of payload.members) {
@@ -47,7 +47,7 @@ export class GroupMessageGateway implements OnGatewayConnection, OnGatewayDiscon
                         const memberSocket = this.server.sockets.sockets.get(session.socketId);
                         if (memberSocket) {
                             await memberSocket.join(groupId);
-                            memberSocket.emit('added-to-group', { groupId, groupName: payload.name, addedBy: client.user.id });
+                            memberSocket.emit('chat:group.member.added', { groupId, groupName: payload.name, addedBy: client.user.id });
                         }
                     }
                 }
@@ -55,7 +55,7 @@ export class GroupMessageGateway implements OnGatewayConnection, OnGatewayDiscon
         }
     }
 
-    @SubscribeMessage('add-member')
+    @SubscribeMessage('chat:group.member.add')
     @AdminOnly()
     @UseGuards(AdminGuard)
     async addMember(
@@ -70,14 +70,14 @@ export class GroupMessageGateway implements OnGatewayConnection, OnGatewayDiscon
             const memberSocket = this.server.sockets.sockets.get(session.socketId);
             if (memberSocket) {
                 await memberSocket.join(payload.groupId);
-                memberSocket.emit('added-to-group', { groupId: payload.groupId, addedBy: client.user.id });
+                memberSocket.emit('chat:group.member.added', { groupId: payload.groupId, addedBy: client.user.id });
             }
         }
 
-        client.emit('member-added', { groupId: payload.groupId, memberId: payload.memberId });
+        client.emit('chat:group.member.added', { groupId: payload.groupId, memberId: payload.memberId });
     }
 
-    @SubscribeMessage('send-message')
+    @SubscribeMessage('chat:message.send')
     async sendMessage(
         @MessageBody() payload: { groupId: string, message: string },
         @ConnectedSocket() client: AuthenticatedSocket
@@ -85,7 +85,7 @@ export class GroupMessageGateway implements OnGatewayConnection, OnGatewayDiscon
         const message = await this.groupMessageService.saveMessage(client.user.id, payload.groupId, payload.message);
         this.logger.log(`Group message sent by ${client.user.id}`);
 
-        this.server.to(payload.groupId).emit('new-message', { ...message });
+        this.server.to(payload.groupId).emit('chat:message.new', { ...message });
 
         const roomSockets = await this.server.in(payload.groupId).fetchSockets();
         const onlineMemberIds = roomSockets
@@ -94,11 +94,11 @@ export class GroupMessageGateway implements OnGatewayConnection, OnGatewayDiscon
 
         if (onlineMemberIds.length > 0) {
             await this.groupMessageService.markAsDelivered(message.id);
-            client.emit('message-delivered', { messageId: message.id, deliveredAt: new Date() });
+            client.emit('chat:message.delivered', { messageId: message.id, deliveredAt: new Date() });
         }
     }
 
-    @SubscribeMessage('mark-as-read')
+    @SubscribeMessage('chat:message.read')
     async markAsRead(
         @MessageBody() payload: { messageId: string },
         @ConnectedSocket() client: AuthenticatedSocket
@@ -108,7 +108,7 @@ export class GroupMessageGateway implements OnGatewayConnection, OnGatewayDiscon
         for (const session of senderSessions) {
             const senderSocket = this.server.sockets.sockets.get(session.socketId);
             if (senderSocket) {
-                senderSocket.emit('message-read', {
+                senderSocket.emit('chat:message.read', {
                     messageId: payload.messageId,
                     readBy: client.user.id,
                     readAt: updatedMessage.readAt
@@ -119,7 +119,7 @@ export class GroupMessageGateway implements OnGatewayConnection, OnGatewayDiscon
         this.logger.log(`Message ${payload.messageId} marked as read by ${client.user.id}`);
     }
 
-    @SubscribeMessage('leave-group')
+    @SubscribeMessage('chat:group.leave')
     async leaveGroup(
         @MessageBody() payload: { groupId: string },
         @ConnectedSocket() client: AuthenticatedSocket
@@ -133,50 +133,50 @@ export class GroupMessageGateway implements OnGatewayConnection, OnGatewayDiscon
             }
         }
         this.logger.log(`User ${client.user.id} left group ${payload.groupId}`);
-        client.emit('left-group', { groupId: payload.groupId });
-        this.server.to(payload.groupId).emit('member-left', { groupId: payload.groupId, memberId: client.user.id });
+        client.emit('chat:group.left', { groupId: payload.groupId });
+        this.server.to(payload.groupId).emit('chat:group.member.left', { groupId: payload.groupId, memberId: client.user.id });
     }
 
-    @SubscribeMessage('typing_started')
+    @SubscribeMessage('chat:group.typing.start')
   async typingStarted(
     @MessageBody() payload: { groupId: string },
     @ConnectedSocket() client: AuthenticatedSocket
   ) {
     await this.groupMessageService.verifyUserInGroup(client.user.id, payload.groupId);
-    
-    if (!this.typingUsers.has(payload.groupId)) {
-      this.typingUsers.set(payload.groupId, new Set());
+    let set = this.typingUsers.get(payload.groupId);
+    if (!set) {
+      set = new Set<string>();
+      this.typingUsers.set(payload.groupId, set);
     }
-    this.typingUsers.get(payload.groupId).add(client.user.id);
+    set.add(client.user.id);
     
-    const typingUserIds = Array.from(this.typingUsers.get(payload.groupId));
+    const typingUserIds = Array.from(set);
     
-    client.to(payload.groupId).emit('users-typing', { 
+    client.to(payload.groupId).emit('chat:group.typing.update', { 
       groupId: payload.groupId, 
       userIds: typingUserIds 
     });
   }
-
-  @SubscribeMessage('typing_stopped')
+  
+  @SubscribeMessage('chat:group.typing.stop')
   async typingStopped(
     @MessageBody() payload: { groupId: string },
     @ConnectedSocket() client: AuthenticatedSocket
   ) {
     await this.groupMessageService.verifyUserInGroup(client.user.id, payload.groupId);
-    
-    if (this.typingUsers.has(payload.groupId)) {
-      this.typingUsers.get(payload.groupId).delete(client.user.id);
-      
-      if (this.typingUsers.get(payload.groupId).size === 0) {
+    const set = this.typingUsers.get(payload.groupId);
+    if (set) {
+      set.delete(client.user.id);
+      if (set.size === 0) {
         this.typingUsers.delete(payload.groupId);
+      } else {
+        this.typingUsers.set(payload.groupId, set);
       }
     }
     
-    const typingUserIds = this.typingUsers.has(payload.groupId) 
-      ? Array.from(this.typingUsers.get(payload.groupId))
-      : [];
+    const typingUserIds = set ? Array.from(set) : [];
     
-    client.to(payload.groupId).emit('users-typing', { 
+    client.to(payload.groupId).emit('chat:group.typing.update', { 
       groupId: payload.groupId, 
       userIds: typingUserIds 
     });

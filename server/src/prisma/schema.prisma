@@ -91,6 +91,8 @@ model Message {
 
 enum MessageType {
   TEXT
+  AUDIO
+  VIDEO
   IMAGE
   FILE
 }
