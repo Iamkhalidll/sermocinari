@@ -61,7 +61,7 @@ export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisco
     }
   }
 
-  @SubscribeMessage('start-conversation')
+  @SubscribeMessage('chat:conversation.start')
   async startConversation(
     @MessageBody() payload: { toUserId: string },
     @ConnectedSocket() client: AuthenticatedSocket,
@@ -74,7 +74,7 @@ export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisco
     await client.join(conversationId);
     this.logger.log(`Sender ${senderId} (${client.id}) joined room ${conversationId}`);
 
-    await this.emitToUserSockets(recipientId, 'joined-room', { conversationId }, true);
+    await this.emitToUserSockets(recipientId, 'chat:conversation.joined', { conversationId }, true);
 
     return {
       status: 'OK',
@@ -82,14 +82,14 @@ export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisco
     };
   }
 
-  @SubscribeMessage('mark-as-read')
+  @SubscribeMessage('chat:message.read')
   async markAsRead(
     @MessageBody() payload: { messageId: string },
     @ConnectedSocket() client: AuthenticatedSocket,
   ) {
     const updatedMessage = await this.directMessageService.markAsRead(payload.messageId, client.user.id);
 
-    await this.emitToUserSockets(updatedMessage.senderId, 'message-read', {
+    await this.emitToUserSockets(updatedMessage.senderId, 'chat:message.read', {
       conversationId: updatedMessage.conversationId,
       messageId: payload.messageId,
       readBy: client.user.id,
@@ -99,7 +99,7 @@ export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisco
     this.logger.log(`Message ${payload.messageId} marked as read by ${client.user.id}`);
   }
 
-  @SubscribeMessage('send-direct-message')
+  @SubscribeMessage('chat:message.send')
   async handleDirectMessage(
     @MessageBody() payload: { conversationId: string; content: string },
     @ConnectedSocket() client: AuthenticatedSocket,
@@ -109,23 +109,23 @@ export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisco
 
     const message = await this.directMessageService.sendTextMessage(conversationId, senderId, content);
 
-    client.emit('message-sent', { ...message, isDelivered: false, deliveredAt: null });
+    client.emit('chat:message.sent', { ...message, isDelivered: false, deliveredAt: null });
 
     const recipientId = message.recipientId as string;
     const recipientSessions = await this.directMessageService.getUserSockets(recipientId);
 
     if (recipientSessions.length > 0) {
-      await this.emitToUserSockets(recipientId, 'new-direct-message', message);
+      await this.emitToUserSockets(recipientId, 'chat:message.new', message);
       this.logger.log(`Message delivered from ${senderId} sent to ${recipientId}`);
 
       await this.directMessageService.markAsDelivered(message.id);
 
-      client.emit('message-delivered', {
+      client.emit('chat:message.delivered', {
         messageId: message.id,
         deliveredAt: new Date(),
       });
     } else {
-      this.server.to(conversationId).emit('new-direct-message', message);
+      client.to(conversationId).emit('chat:message.new', message);
     }
 
     return {
@@ -134,7 +134,7 @@ export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisco
     };
   }
 
-  @SubscribeMessage('typing_started')
+  @SubscribeMessage('chat:typing.start')
   async handleTypingStarted(
     @MessageBody() payload: { conversationId: string },
     @ConnectedSocket() client: AuthenticatedSocket,
@@ -144,13 +144,13 @@ export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisco
       client.user.id
     );
 
-    await this.emitToUserSockets(recipientId, 'user-typing', {
+    await this.emitToUserSockets(recipientId, 'chat:typing.start', {
       conversationId: payload.conversationId,
       userId: client.user.id,
     });
   }
 
-  @SubscribeMessage('typing_stopped')
+  @SubscribeMessage('chat:typing.stop')
   async handleTypingStopped(
     @MessageBody() payload: { conversationId: string },
     @ConnectedSocket() client: AuthenticatedSocket,
@@ -160,10 +160,45 @@ export class DirectMessageGateway implements OnGatewayConnection, OnGatewayDisco
       client.user.id
     );
 
-    await this.emitToUserSockets(recipientId, 'user-stopped-typing', {
+    await this.emitToUserSockets(recipientId, 'chat:typing.stop', {
       conversationId: payload.conversationId,
       userId: client.user.id,
     });
   }
 
+  @SubscribeMessage('chat:voice.record.start')
+  async handleVoiceRecordStarted(
+    @MessageBody() payload: { conversationId: string },
+    @ConnectedSocket() client: AuthenticatedSocket,
+  ) {
+    const recipientId = await this.directMessageService.verifyUserAndGetRecipient(
+      payload.conversationId,
+      client.user.id
+    );
+    await this.emitToUserSockets(recipientId, 'chat:voice.record.start',{userId:client.user.id,conversationId:payload.conversationId});
+  }
+  
+  @SubscribeMessage('chat:voice.record.stop')
+  async handleVoiceRecordStopped(
+    @MessageBody() payload: { conversationId: string ,url:string, duration:number, createdAt:Date,mimeType:string},
+    @ConnectedSocket() client: AuthenticatedSocket,
+  ){
+    const message = await this.directMessageService.sendVoiceMessage(payload.conversationId,payload.url,payload.duration,payload.mimeType,client.user.id,new Date(payload.createdAt));
+
+    client.emit('chat:message.sent', { ...message, isDelivered: false, deliveredAt: null });
+    this.logger.log(`Voice Message sent from ${client.user.id} in conversation ${payload.conversationId}`);
+    const recipientId = message.recipientId as string;
+    const recipientSessions = await this.directMessageService.getUserSockets(recipientId);
+    if (recipientSessions.length > 0) {
+      await this.emitToUserSockets(recipientId, 'chat:message.new', message);
+      this.logger.log(`Voice Message delivered from ${client.user.id} sent to ${recipientId}`);
+      await this.directMessageService.markAsDelivered(message.id);
+      client.emit('chat:message.delivered', {
+        messageId: message.id,
+        deliveredAt: new Date(),
+      });
+    }else{
+      client.to(payload.conversationId).emit('chat:message.new', message);
+    }
+  }
 }

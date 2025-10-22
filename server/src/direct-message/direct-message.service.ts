@@ -20,7 +20,6 @@ export class DirectMessageService {
         }
         throw new WsException(contextMessage);
     }
-
     async startConversation(
         fromUserId: string,
         toUserId: string,
@@ -69,17 +68,7 @@ export class DirectMessageService {
         content: string,
     ) {
         try {
-            const isUserInConversation = await this.conversationManager.isUserInConversation(conversationId, senderId);
-            if (!isUserInConversation) {
-                throw new WsException('User is not part of this conversation');
-            }
-            const participants = await this.conversationManager.getConversationParticipants(conversationId);
-            const recipientId = participants.find(id => id !== senderId);
-
-            if (!recipientId) {
-                throw new WsException('Conversation does not have a valid recipient.');
-            }
-
+            const recipientId = await this.verifyUserAndGetRecipient(conversationId, senderId);
             const message = await this.directMessageRepository.createTextMessage(
                 conversationId,
                 senderId,
@@ -94,7 +83,7 @@ export class DirectMessageService {
 
     async verifyUserAndGetRecipient(conversationId: string, userId: string): Promise<string> {
         try {
-            if (!(await this.conversationManager.isUserInConversation(conversationId, userId))) {
+             if (!(await this.conversationManager.isUserInConversation(conversationId, userId))) {
                 throw new WsException('User is not part of this conversation');
             }
 
@@ -107,6 +96,15 @@ export class DirectMessageService {
             return recipient[0];
         } catch (error) {
             this.handleError(error, 'Could not verify user or find recipient');
+        }
+    }
+
+    async sendVoiceMessage(conversationId:string, mediaUrl:string,duration:number,mimeType:string,senderId:string,createdAt:Date){
+        try{
+            return await this.directMessageRepository.createVoiceMessage(createdAt,conversationId,senderId,(await this.verifyUserAndGetRecipient(conversationId,senderId)),mediaUrl,duration,mimeType);
+        }
+        catch(error){
+            this.handleError(error,'Could not send voice message')
         }
     }
 }

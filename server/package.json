@@ -20,7 +20,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "db:generate": "prisma generate --schema=src/prisma/schema.prisma",
     "db:migrate": "prisma migrate dev --schema=src/prisma/schema.prisma",
-    "db:deploy ": "prisma migrate deploy --schema=src/prisma/schema.prisma"
+    "db:deploy": "prisma migrate deploy --schema=src/prisma/schema.prisma"
   },
   "dependencies": {
     "@keyv/redis": "^5.1.2",

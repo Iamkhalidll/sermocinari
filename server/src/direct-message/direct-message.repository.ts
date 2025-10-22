@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { WsException } from '@nestjs/websockets';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Message } from '@prisma/client';
+import { Message,MessageType } from '@prisma/client';
 import { SessionService } from '../session/session.service'; 
 
 @Injectable()
@@ -79,5 +79,21 @@ export class DirectMessageRepository {
                 readAt: new Date()
             }
         });
+    }
+
+    async createVoiceMessage(createdAt:Date,conversationId:string,senderId:string,recipientId:string, mediaUrl:string, duration:number, mimeType:string): Promise<Message> {
+        return  await this.prisma.message.create({
+            data:{
+                conversationId,
+                senderId,
+                recipientId,
+                mimeType,
+                mediaUrl,
+                duration,
+                type:MessageType.AUDIO,
+                createdAt
+            }
+        })
+        
     }
 }

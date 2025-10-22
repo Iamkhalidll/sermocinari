@@ -74,8 +74,11 @@ model Message {
   conversationId String
   senderId       String
   recipientId    String?
-  content        String
+  content        String?
   type           MessageType @default(TEXT)
+  mediaUrl       String?      
+  duration       Int?          
+  mimeType       String?       
   isDelivered    Boolean  @default(false)
   deliveredAt    DateTime?
   isRead         Boolean  @default(false)
