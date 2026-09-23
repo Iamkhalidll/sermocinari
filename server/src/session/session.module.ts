@@ -20,7 +20,9 @@ import { SessionService } from './session.service';
         logger.log('✅ Memory cache (primary) initialized for sessions');
 
         try {
-          const redisStore = new KeyvRedis('redis://redis:6379');
+          const redisHost = process.env.REDIS_HOST ?? 'localhost';
+          const redisPort = process.env.REDIS_PORT ?? '6379';
+          const redisStore = new KeyvRedis(`redis://${redisHost}:${redisPort}`);
           
           await redisStore.set('connection-test', 'ok');
           await redisStore.delete('connection-test');

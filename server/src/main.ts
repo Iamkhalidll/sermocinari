@@ -6,6 +6,6 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   app.useGlobalFilters(new CustomWsExceptionFilter());
   await app.listen(process.env.PORT ?? 3000);
-  console.log('app is running')
+  console.log('app is running');
 }
 bootstrap();

@@ -41,6 +41,9 @@ export class MailService implements OnModuleInit {
         user: gmailUser,
         pass: gmailPassword,
       },
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 20_000,
       tls: {
         rejectUnauthorized: false
       }
@@ -64,7 +67,6 @@ export class MailService implements OnModuleInit {
         'Failed to verify Gmail SMTP connection:',
         error.message,
       );
-      throw error;
     }
   }
 
@@ -87,7 +89,7 @@ export class MailService implements OnModuleInit {
       const result = await this.transporter.sendMail(mailOptions);
       this.logger.log(`Email sent successfully via Gmail SMTP. Message ID: ${result.messageId}`);
       return true;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Error sending email via Gmail SMTP: ${error.message}`, error.stack);
 
       // Log additional error details if available
@@ -353,7 +355,7 @@ export class MailService implements OnModuleInit {
       }
 
       return failed === 0;
-    } catch (error) {
+    } catch (error: any) {
       this.logger.error(`Error sending bulk emails via Gmail SMTP: ${error.message}`, error.stack);
       return false;
     }

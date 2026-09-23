@@ -8,8 +8,8 @@ import { ConfigModule } from '@nestjs/config';
 import { AuthRepository } from './auth.repository';
 @Module({
   imports: [ConfigModule,PrismaModule,MailModule,JwtModule.register({
-    secret:process.env.JWT_SECRET,
-    signOptions:{ expiresIn: process.env.JWT_EXPIRATION_TIME}
+    secret: process.env.JWT_SECRET,
+    signOptions: { expiresIn: Number(process.env.JWT_EXPIRATION_TIME ?? 3600) },
   })],
   controllers: [AuthController],
   providers: [AuthService,AuthRepository],
